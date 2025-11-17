@@ -1,8 +1,4 @@
 import { registerRootComponent } from "expo";
-import AppNavigator from "./navigation/AppNavigator";
-
-export default function App() {
-  return <AppNavigator />;
-}
+import App from "./App"; // ✅ Use App.tsx as entry point
 
 registerRootComponent(App);

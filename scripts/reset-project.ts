@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * This script is used to reset the project to a blank state.
- * It deletes or moves the /app, /components, /hooks, /scripts, and /constants directories to /app-example based on user input and creates a new /app directory with an index.tsx and _layout.tsx file.
- * You can remove the `reset-project` script from package.json and safely delete this file after running it.
+ * This script resets the project to a blank state.
+ * It deletes or moves the /app, /components, /hooks, /scripts, and /constants directories to /app-example based on user input,
+ * and creates a new /app directory with index.tsx and _layout.tsx files.
  */
 
-const fs = require("fs");
-const path = require("path");
-const readline = require("readline");
+import fs from "fs";
+import path from "path";
+import readline from "readline";
 
 const root = process.cwd();
 const oldDirs = ["app", "components", "hooks", "constants", "scripts"];
@@ -45,7 +45,7 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-const moveDirectories = async (userInput) => {
+const moveDirectories = async (userInput: string): Promise<void> => {
   try {
     if (userInput === "y") {
       // Create the app-example directory
@@ -93,14 +93,18 @@ const moveDirectories = async (userInput) => {
           : ""
       }`
     );
-  } catch (error) {
-    console.error(`❌ Error during script execution: ${error.message}`);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(`❌ Error during script execution: ${error.message}`);
+    } else {
+      console.error("❌ An unknown error occurred during script execution.");
+    }
   }
 };
 
 rl.question(
   "Do you want to move existing files to /app-example instead of deleting them? (Y/n): ",
-  (answer) => {
+  (answer: string) => {
     const userInput = answer.trim().toLowerCase() || "y";
     if (userInput === "y" || userInput === "n") {
       moveDirectories(userInput).finally(() => rl.close());

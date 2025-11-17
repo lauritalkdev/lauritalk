@@ -1,0 +1,96 @@
+mutation CreateDemoData @transaction @auth(level: PUBLIC, insecureReason: "This operation is used to seed the database with initial data and is safe to expose to the public") {
+  user_insertMany(data: [
+    {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      username: "demouser1",
+      email: "demouser1@example.com",
+      walletAddress: "wallet1",
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "550e8400-e29b-41d4-a716-446655440001",
+      username: "demouser2",
+      email: "demouser2@example.com",
+      walletAddress: "wallet2",
+      createdAt: "2024-01-01T00:00:00Z"
+    }
+  ])
+  subscriptionType_insertMany(data: [
+    {
+      id: "650e8400-e29b-41d4-a716-446655440002",
+      name: "Basic",
+      pricePerMonth: 9.99,
+      maxTranslationsPerMonth: 100,
+      hasPremiumFeatures: false,
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "650e8400-e29b-41d4-a716-446655440003",
+      name: "Premium",
+      pricePerMonth: 19.99,
+      maxTranslationsPerMonth: 500,
+      hasPremiumFeatures: true,
+      createdAt: "2024-01-01T00:00:00Z"
+    }
+  ])
+  userSubscription_insertMany(data: [
+    {
+      id: "750e8400-e29b-41d4-a716-446655440004",
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      subscriptionTypeId: "650e8400-e29b-41d4-a716-446655440002",
+      startDate: "2024-01-01T00:00:00Z",
+      endDate: "2025-01-01T00:00:00Z",
+      isActive: true,
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "750e8400-e29b-41d4-a716-446655440005",
+      userId: "550e8400-e29b-41d4-a716-446655440001",
+      subscriptionTypeId: "650e8400-e29b-41d4-a716-446655440003",
+      startDate: "2024-01-01T00:00:00Z",
+      endDate: "2025-01-01T00:00:00Z",
+      isActive: true,
+      createdAt: "2024-01-01T00:00:00Z"
+    }
+  ])
+  translation_insertMany(data: [
+    {
+      id: "850e8400-e29b-41d4-a716-446655440006",
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      sourceLanguage: "en",
+      targetLanguage: "es",
+      sourceText: "Hello",
+      targetText: "Hola",
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "850e8400-e29b-41d4-a716-446655440007",
+      userId: "550e8400-e29b-41d4-a716-446655440001",
+      sourceLanguage: "fr",
+      targetLanguage: "en",
+      sourceText: "Bonjour",
+      targetText: "Hello",
+      createdAt: "2024-01-01T00:00:00Z"
+    }
+  ])
+  lexiconEntry_insertMany(data: [
+    {
+      id: "950e8400-e29b-41d4-a716-446655440008",
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      term: "example",
+      sourceLanguage: "en",
+      targetLanguage: "es",
+      customTranslation: "ejemplo",
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "950e8400-e29b-41d4-a716-446655440009",
+      userId: "550e8400-e29b-41d4-a716-446655440001",
+      term: "test",
+      sourceLanguage: "en",
+      targetLanguage: "fr",
+      customTranslation: "test",
+      createdAt: "2024-01-01T00:00:00Z"
+    }
+  ])
+}

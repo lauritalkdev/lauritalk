@@ -1,0 +1,37 @@
+mutation CreateUser @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  user_insert(data: {
+    createdAt_expr: "request.time",
+    walletAddress: "0x0000000000000000000000000000000000000000"
+  })
+}
+
+query GetTranslations @auth(level: USER) {
+  translations(where: {userId: {eq_expr: "auth.uid"}}) {
+    id
+    sourceText
+    targetText
+    sourceLanguage
+    targetLanguage
+  }
+}
+
+mutation CreateLexiconEntry($term: String!, $customTranslation: String!, $sourceLanguage: String!, $targetLanguage: String!) @auth(level: USER) {
+  lexiconEntry_insert(data: {
+    userId_expr: "auth.uid",
+    term: $term,
+    customTranslation: $customTranslation,
+    sourceLanguage: $sourceLanguage,
+    targetLanguage: $targetLanguage,
+    createdAt_expr: "request.time"
+  })
+}
+
+query ListSubscriptionTypes @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  subscriptionTypes {
+    id
+    name
+    pricePerMonth
+    maxTranslationsPerMonth
+    hasPremiumFeatures
+  }
+}

@@ -1,0 +1,44 @@
+type User @table {
+  walletAddress: String!
+  createdAt: Timestamp!
+  username: String
+  email: String
+}
+
+type Translation @table {
+  sourceText: String!
+  targetText: String!
+  sourceLanguage: String!
+  targetLanguage: String!
+  createdAt: Timestamp!
+  inputAudioUrl: String
+  outputAudioUrl: String
+  feedbackRating: Int
+  user: User
+}
+
+type LexiconEntry @table {
+  term: String!
+  sourceLanguage: String!
+  targetLanguage: String!
+  customTranslation: String!
+  createdAt: Timestamp!
+  user: User
+}
+
+type SubscriptionType @table {
+  name: String!
+  pricePerMonth: Float!
+  maxTranslationsPerMonth: Int!
+  hasPremiumFeatures: Boolean!
+  createdAt: Timestamp!
+}
+
+type UserSubscription @table {
+  startDate: Timestamp!
+  endDate: Timestamp!
+  isActive: Boolean!
+  createdAt: Timestamp!
+  user: User
+  subscriptionType: SubscriptionType
+}

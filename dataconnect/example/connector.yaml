@@ -1,0 +1,18 @@
+connectorId: example
+generate:
+  javascriptSdk:
+    - outputDir: ..\..\src\dataconnect-generated
+      package: "@dataconnect/generated"
+      packageJsonDir: ..\..
+      react: true
+      angular: false
+    - outputDir: ..\..\lauritalk-translate-proxy\src\dataconnect-generated
+      package: "@dataconnect/generated"
+      packageJsonDir: ..\..\lauritalk-translate-proxy
+      react: false
+      angular: false
+    - outputDir: ..\..\lauritalk-azure-proxy\src\dataconnect-generated
+      package: "@dataconnect/generated"
+      packageJsonDir: ..\..\lauritalk-azure-proxy
+      react: false
+      angular: false
