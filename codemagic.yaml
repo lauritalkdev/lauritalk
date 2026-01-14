@@ -6,25 +6,27 @@ workflows:
     
     environment:
       vars:
-        EXPO_TOKEN: $EXPO_TOKEN
+        GRADLE_OPTS: "-Xmx3072m -XX:MaxPermSize=512m"
     
     scripts:
       - name: Install dependencies
         script: |
-          npm install
-          npm install -g eas-cli
+          npm install --legacy-peer-deps
       
       - name: Build Android APK
         script: |
-          eas build --platform android --build-type apk --non-interactive
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
       
       - name: Build Android App Bundle (AAB)
         script: |
-          eas build --platform android --build-type app-bundle --non-interactive
+          cd android
+          ./gradlew bundleRelease
     
     artifacts:
-      - build-*.apk
-      - build-*.aab
+      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/bundle/release/*.aab
     
     publishing:
       email:
