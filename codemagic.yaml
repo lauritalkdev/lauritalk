@@ -6,40 +6,25 @@ workflows:
     
     environment:
       vars:
-        KEYSTORE_PATH: /tmp/keystore.jks
-        KEYSTORE_PASSWORD: $KEYSTORE_PASSWORD
-        KEY_PASSWORD: $KEY_PASSWORD
-        KEY_ALIAS: $KEY_ALIAS
-        GRADLE_OPTS: "-Xmx3072m -XX:MaxPermSize=512m"
+        EXPO_TOKEN: $EXPO_TOKEN
     
     scripts:
       - name: Install dependencies
         script: |
           npm install
-          npx expo-cli --version
+          npm install -g eas-cli
       
       - name: Build Android APK
         script: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease \
-            -PMYAPP_RELEASE_STORE_FILE=$KEYSTORE_PATH \
-            -PMYAPP_RELEASE_STORE_PASSWORD=$KEYSTORE_PASSWORD \
-            -PMYAPP_RELEASE_KEY_ALIAS=$KEY_ALIAS \
-            -PMYAPP_RELEASE_KEY_PASSWORD=$KEY_PASSWORD
+          eas build --platform android --build-type apk --non-interactive
       
       - name: Build Android App Bundle (AAB)
         script: |
-          cd android
-          ./gradlew bundleRelease \
-            -PMYAPP_RELEASE_STORE_FILE=$KEYSTORE_PATH \
-            -PMYAPP_RELEASE_STORE_PASSWORD=$KEYSTORE_PASSWORD \
-            -PMYAPP_RELEASE_KEY_ALIAS=$KEY_ALIAS \
-            -PMYAPP_RELEASE_KEY_PASSWORD=$KEY_PASSWORD
+          eas build --platform android --build-type app-bundle --non-interactive
     
     artifacts:
-      - android/app/build/outputs/apk/release/*.apk
-      - android/app/build/outputs/bundle/release/*.aab
+      - build-*.apk
+      - build-*.aab
     
     publishing:
       email:
