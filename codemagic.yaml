@@ -5,8 +5,6 @@ workflows:
     max_build_duration: 120
     
     environment:
-      android_home: /opt/android
-      java_home: /usr/lib/jvm/java-11-openjdk-amd64
       vars:
         KEYSTORE_PATH: /tmp/keystore.jks
         KEYSTORE_PASSWORD: $KEYSTORE_PASSWORD
