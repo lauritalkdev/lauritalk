@@ -12,15 +12,20 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   Vibration,
   View
 } from 'react-native';
 
 // OpenAI API Key
-const OPENAI_API_KEY = 'your-api-key-here';
+const OPENAI_API_KEY = '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';
 
 import { supabase } from '../supabase';
+// 🟢 CHANGED: Use new word limit hook
+import { useWordLimits } from '../hooks/useWordLimits';
+// 🟢 ADDED: Limit exceeded modal import
+import LimitExceededModal from '../components/LimitExceededModal';
 
 const countValidWords = (text: string): number => {
   if (!text || text.trim().length === 0) return 0;
@@ -93,6 +98,23 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
   const [showToLanguageSelector, setShowToLanguageSelector] = useState(false);
   const [pulseAnim] = useState(new Animated.Value(1));
   const [speakingTranslation, setSpeakingTranslation] = useState<string | null>(null);
+  // 🟢 ADDED: Search states for language selectors
+  const [searchFromQuery, setSearchFromQuery] = useState('');
+  const [searchToQuery, setSearchToQuery] = useState('');
+
+  // 🟢 CHANGED: Use new word limit hook
+  const { 
+    checkAndUpdateWordCount,
+    modalVisible,
+    modalType,
+    remainingWords,
+    usedWords,
+    limitWords,
+    closeModal,
+    upgradeToPremium,
+    loadLimitStatus,
+    calculateWordCount
+  } = useWordLimits();
 
   // 🟢 ADDED: Language switch function
   const switchLanguages = () => {
@@ -100,6 +122,57 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
     setFromLanguage(targetLanguage);
     setTargetLanguage(temp);
     setDebugInfo('🔄 Languages switched!');
+  };
+
+  // 🟢 ADDED: Handle upgrade button press
+  const handleUpgrade = async () => {
+    closeModal();
+    Alert.alert(
+      "Upgrade to Premium",
+      "Choose your premium plan:",
+      [
+        {
+          text: "1 Month - $9.99",
+          onPress: async () => {
+            const success = await upgradeToPremium('monthly');
+            if (success) {
+              Alert.alert("Success", "You've been upgraded to Premium for 30 days!");
+              await loadLimitStatus();
+            } else {
+              Alert.alert("Error", "Failed to upgrade. Please try again.");
+            }
+          }
+        },
+        {
+          text: "6 Months - $49.99",
+          onPress: async () => {
+            const success = await upgradeToPremium('6months');
+            if (success) {
+              Alert.alert("Success", "You've been upgraded to Premium for 180 days!");
+              await loadLimitStatus();
+            } else {
+              Alert.alert("Error", "Failed to upgrade. Please try again.");
+            }
+          }
+        },
+        {
+          text: "1 Year - $89.99",
+          onPress: async () => {
+            const success = await upgradeToPremium('yearly');
+            if (success) {
+              Alert.alert("Success", "You've been upgraded to Premium for 360 days!");
+              await loadLimitStatus();
+            } else {
+              Alert.alert("Error", "Failed to upgrade. Please try again.");
+            }
+          }
+        },
+        {
+          text: "Cancel",
+          style: "cancel"
+        }
+      ]
+    );
   };
 
   // 🟢 UPDATED: 110+ languages categorized by continents
@@ -267,6 +340,28 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
 
   // Flatten all languages for easy access
   const allLanguages = languageCategories.flatMap(category => category.languages);
+
+  // 🟢 ADDED: Function to get filtered languages based on search query
+  const getFilteredLanguages = (query: string) => {
+    if (!query.trim()) {
+      return languageCategories;
+    }
+    
+    const searchQuery = query.toLowerCase().trim();
+    const filteredCategories = languageCategories.map(category => ({
+      ...category,
+      languages: category.languages.filter(lang => 
+        lang.name.toLowerCase().includes(searchQuery) || 
+        lang.code.toLowerCase().includes(searchQuery) ||
+        lang.native.toLowerCase().includes(searchQuery)
+      )
+    })).filter(category => category.languages.length > 0);
+    
+    return filteredCategories;
+  };
+
+  const currentFromSearchResults = getFilteredLanguages(searchFromQuery);
+  const currentToSearchResults = getFilteredLanguages(searchToQuery);
 
   const speakTranslatedText = async (text: string, languageCode: string) => {
     try {
@@ -556,6 +651,14 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
             usedOpenAI = false;
           }
           
+          // 🟢 CHANGED: Check word limit using new system
+          const { allowed } = await checkAndUpdateWordCount(transcribedText);
+          if (!allowed) {
+            console.log('Voice-to-voice translation blocked due to word limit');
+            setIsProcessing(false);
+            return; // Stop translation if limit exceeded
+          }
+          
           const translatedText = await translateWithOpenAI(transcribedText, fromLanguage, targetLanguage);
           
           await saveVoiceToVoiceTranslationToHistory(
@@ -626,6 +729,7 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
   const selectFromLanguage = (langCode: string) => {
     setFromLanguage(langCode);
     setShowFromLanguageSelector(false);
+    setSearchFromQuery(""); // Reset search
     const lang = allLanguages.find(l => l.code === langCode);
     setDebugInfo(`🎤 Input language: ${lang?.emoji} ${lang?.name}`);
   };
@@ -633,49 +737,106 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
   const selectToLanguage = (langCode: string) => {
     setTargetLanguage(langCode);
     setShowToLanguageSelector(false);
+    setSearchToQuery(""); // Reset search
     const lang = allLanguages.find(l => l.code === langCode);
     setDebugInfo(`🌍 Output language: ${lang?.emoji} ${lang?.name}`);
   };
 
-  const LanguageSelector = ({ type }: { type: 'from' | 'to' }) => (
-    <View style={styles.languageSelector}>
-      <Text style={styles.selectorTitle}>
-        Select {type === 'from' ? 'Input' : 'Output'} Language
-      </Text>
-      <ScrollView style={styles.languageList}>
-        {languageCategories.map((category, categoryIndex) => (
-          <View key={categoryIndex} style={styles.categorySection}>
-            <Text style={styles.categoryTitle}>{category.name}</Text>
-            {category.languages.map((lang) => (
-              <TouchableOpacity
-                key={lang.code}
-                style={[
-                  styles.languageItem,
-                  (type === 'from' ? fromLanguage : targetLanguage) === lang.code && styles.selectedLanguageItem
-                ]}
-                onPress={() => type === 'from' ? selectFromLanguage(lang.code) : selectToLanguage(lang.code)}
-              >
-                <Text style={styles.languageEmoji}>{lang.emoji}</Text>
-                <View style={styles.languageTextContainer}>
-                  <Text style={styles.languageName}>{lang.name}</Text>
-                  <Text style={styles.languageNative}>{lang.native}</Text>
-                </View>
-                {(type === 'from' ? fromLanguage : targetLanguage) === lang.code && (
-                  <Ionicons name="checkmark-circle" size={20} color="#D4AF37" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        ))}
-      </ScrollView>
-      <TouchableOpacity 
-        style={styles.closeSelectorButton}
-        onPress={() => type === 'from' ? setShowFromLanguageSelector(false) : setShowToLanguageSelector(false)}
-      >
-        <Text style={styles.closeSelectorText}>Close</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  // 🟢 UPDATED: LanguageSelector component with search bar
+  const LanguageSelector = ({ type }: { type: 'from' | 'to' }) => {
+    const filteredCategories = type === 'from' ? currentFromSearchResults : currentToSearchResults;
+    const searchQuery = type === 'from' ? searchFromQuery : searchToQuery;
+    const setSearchQuery = type === 'from' ? setSearchFromQuery : setSearchToQuery;
+    const totalLanguages = filteredCategories.flatMap(cat => cat.languages).length;
+    
+    return (
+      <View style={styles.languageSelector}>
+        <Text style={styles.selectorTitle}>
+          Select {type === 'from' ? 'Input' : 'Output'} Language
+        </Text>
+        
+        {/* 🟢 ADDED: Search Bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#D4AF37" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search languages..."
+            placeholderTextColor="#888"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity 
+              style={styles.clearButton}
+              onPress={() => setSearchQuery("")}
+            >
+              <Ionicons name="close-circle" size={18} color="#888" />
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        {/* 🟢 ADDED: Search results info - FIXED PROPERLY */}
+        {searchQuery.trim() && (
+          <Text style={styles.searchResultsText}>
+            Found {totalLanguages} language{totalLanguages !== 1 ? 's' : ''} for "{searchQuery}"
+          </Text>
+        )}
+        
+        <ScrollView style={styles.languageList}>
+          {filteredCategories.length > 0 ? (
+            filteredCategories.map((category, categoryIndex) => (
+              <View key={categoryIndex} style={styles.categorySection}>
+                <Text style={styles.categoryTitle}>{category.name}</Text>
+                {category.languages.map((lang) => (
+                  <TouchableOpacity
+                    key={lang.code}
+                    style={[
+                      styles.languageItem,
+                      (type === 'from' ? fromLanguage : targetLanguage) === lang.code && styles.selectedLanguageItem
+                    ]}
+                    onPress={() => type === 'from' ? selectFromLanguage(lang.code) : selectToLanguage(lang.code)}
+                  >
+                    <Text style={styles.languageEmoji}>{lang.emoji}</Text>
+                    <View style={styles.languageTextContainer}>
+                      <Text style={styles.languageName}>{lang.name}</Text>
+                      <Text style={styles.languageNative}>{lang.native}</Text>
+                    </View>
+                    {(type === 'from' ? fromLanguage : targetLanguage) === lang.code && (
+                      <Ionicons name="checkmark-circle" size={20} color="#D4AF37" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptySearchContainer}>
+              <Ionicons name="search-outline" size={40} color="#D4AF37" />
+              <Text style={styles.emptySearchText}>No languages found</Text>
+              <Text style={styles.emptySearchSubtext}>
+                Try searching with different terms
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+        <TouchableOpacity 
+          style={styles.closeSelectorButton}
+          onPress={() => {
+            if (type === 'from') {
+              setShowFromLanguageSelector(false);
+              setSearchFromQuery(""); // Reset search
+            } else {
+              setShowToLanguageSelector(false);
+              setSearchToQuery(""); // Reset search
+            }
+          }}
+        >
+          <Text style={styles.closeSelectorText}>Close</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -694,6 +855,17 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
+          {/* 🟢 UPDATED: Limit Exceeded Modal with proper props */}
+          <LimitExceededModal
+            visible={modalVisible}
+            type={modalType}
+            remainingWords={remainingWords}
+            usedWords={usedWords}
+            limitWords={limitWords}
+            onClose={closeModal}
+            onUpgrade={handleUpgrade}
+          />
+
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <TouchableOpacity
               style={[styles.recordButton, isRecording && styles.recording]}
@@ -718,17 +890,20 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
              '🎤 Start Recording'}
           </Text>
 
-          {/* FROM LANGUAGE SELECTOR */}
+          {/* FROM LANGUAGE SELECTOR - REDUCED BY 10% */}
           <TouchableOpacity 
             style={styles.languageToggle}
-            onPress={() => setShowFromLanguageSelector(true)}
+            onPress={() => {
+              setShowFromLanguageSelector(true);
+              setSearchFromQuery(""); // Reset search when opening
+            }}
           >
             <Text style={styles.languageEmoji}>{getCurrentFromLanguage().emoji}</Text>
             <View style={styles.languageInfo}>
               <Text style={styles.languageToggleText}>Speak in {getCurrentFromLanguage().name}</Text>
               <Text style={styles.languageNativeText}>{getCurrentFromLanguage().native}</Text>
             </View>
-            <Ionicons name="chevron-down" size={20} color="#D4AF37" />
+            <Ionicons name="chevron-down" size={18} color="#D4AF37" /> {/* Reduced from 20 to 18 */}
           </TouchableOpacity>
 
           {/* 🟢 ADDED: Language Switch Button */}
@@ -736,20 +911,23 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
             style={styles.switchButton}
             onPress={switchLanguages}
           >
-            <Ionicons name="swap-vertical" size={24} color="#D4AF37" />
+            <Ionicons name="swap-vertical" size={22} color="#D4AF37" /> {/* Reduced from 24 to 22 */}
           </TouchableOpacity>
 
-          {/* TO LANGUAGE SELECTOR */}
+          {/* TO LANGUAGE SELECTOR - REDUCED BY 10% */}
           <TouchableOpacity 
             style={[styles.languageToggle, styles.toLanguageToggle]}
-            onPress={() => setShowToLanguageSelector(true)}
+            onPress={() => {
+              setShowToLanguageSelector(true);
+              setSearchToQuery(""); // Reset search when opening
+            }}
           >
             <Text style={styles.languageEmoji}>{getCurrentToLanguage().emoji}</Text>
             <View style={styles.languageInfo}>
               <Text style={styles.languageToggleText}>Translate to {getCurrentToLanguage().name}</Text>
               <Text style={styles.languageNativeText}>{getCurrentToLanguage().native}</Text>
             </View>
-            <Ionicons name="chevron-down" size={20} color="#2E8B57" />
+            <Ionicons name="chevron-down" size={18} color="#2E8B57" /> {/* Reduced from 20 to 18 */}
           </TouchableOpacity>
 
           {/* Stop Speech Button */}
@@ -758,7 +936,7 @@ const VoiceToVoiceScreen = ({ navigation }: any) => {
               style={[styles.languageToggle, styles.stopSpeechButton]}
               onPress={stopAllSpeech}
             >
-              <Ionicons name="stop-circle" size={20} color="#FF4444" />
+              <Ionicons name="stop-circle" size={18} color="#FF4444" /> {/* Reduced from 20 to 18 */}
               <Text style={styles.stopSpeechText}>Stop Speech</Text>
             </TouchableOpacity>
           )}
@@ -909,29 +1087,28 @@ const styles = StyleSheet.create({
   },
   recording: { backgroundColor: '#FF4444', shadowColor: '#FF4444' },
   buttonText: {
-    color: '#D4AF37', fontSize: 18, fontWeight: '700', marginBottom: 25, textAlign: 'center'
+    color: '#D4AF37', fontSize: 18, fontWeight: '700', marginBottom: 22.5, textAlign: 'center'
   },
   languageToggle: {
-    backgroundColor: '#1a1a1a', padding: 16, borderRadius: 12, marginBottom: 12,
-    borderWidth: 2, borderColor: '#D4AF37', flexDirection: 'row', alignItems: 'center', width: '90%',
+    backgroundColor: '#1a1a1a', padding: 14.4, borderRadius: 10.8, marginBottom: 10.8,
+    borderWidth: 1.8, borderColor: '#D4AF37', flexDirection: 'row', alignItems: 'center', width: '81%',
   },
-  toLanguageToggle: { borderColor: '#2E8B57', marginBottom: 12 },
-  // 🟢 ADDED: Switch button styles
+  toLanguageToggle: { borderColor: '#2E8B57', marginBottom: 10.8 },
   switchButton: {
     backgroundColor: 'rgba(212, 175, 55, 0.1)',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 2,
+    padding: 10.8,
+    borderRadius: 9,
+    borderWidth: 1.8,
     borderColor: '#D4AF37',
-    marginBottom: 12,
+    marginBottom: 10.8,
     alignSelf: 'center',
   },
-  stopSpeechButton: { borderColor: '#FF4444', marginBottom: 20 },
-  stopSpeechText: { color: '#FF4444', fontSize: 16, fontWeight: 'bold', marginLeft: 8 },
-  languageEmoji: { fontSize: 24, marginRight: 12 },
+  stopSpeechButton: { borderColor: '#FF4444', marginBottom: 18 },
+  stopSpeechText: { color: '#FF4444', fontSize: 14.4, fontWeight: 'bold', marginLeft: 7.2 },
+  languageEmoji: { fontSize: 21.6, marginRight: 10.8 },
   languageInfo: { flex: 1 },
-  languageToggleText: { color: '#D4AF37', fontSize: 16, fontWeight: 'bold' },
-  languageNativeText: { color: '#888', fontSize: 12, marginTop: 2 },
+  languageToggleText: { color: '#D4AF37', fontSize: 14.4, fontWeight: 'bold' },
+  languageNativeText: { color: '#888', fontSize: 10.8, marginTop: 1.8 },
   infoBox: {
     width: '100%', backgroundColor: '#1a1a1a', borderRadius: 16, padding: 20,
     marginBottom: 20, borderLeftWidth: 4, borderLeftColor: '#D4AF37',
@@ -999,7 +1176,52 @@ const styles = StyleSheet.create({
     color: '#D4AF37', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 20,
   },
   languageList: { maxHeight: '70%' },
-  // 🟢 ADDED: Category section styles
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: '#000',
+    borderWidth: 1,
+    borderColor: '#D4AF37',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#D4AF37',
+    fontSize: 16,
+    padding: 0,
+  },
+  clearButton: {
+    padding: 4,
+  },
+  searchResultsText: {
+    color: '#2E8B57',
+    fontSize: 12,
+    textAlign: "center",
+    marginBottom: 10,
+    fontStyle: "italic",
+  },
+  emptySearchContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+  },
+  emptySearchText: {
+    color: '#D4AF37',
+    fontSize: 16,
+    fontWeight: "bold",
+    marginTop: 10,
+  },
+  emptySearchSubtext: {
+    color: '#888',
+    fontSize: 14,
+    marginTop: 5,
+  },
   categorySection: {
     marginBottom: 20,
   },

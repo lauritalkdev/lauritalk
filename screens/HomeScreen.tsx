@@ -6,13 +6,12 @@ import {
   Dimensions,
   Easing,
   Image,
+  Linking,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import PaymentButton from '../components/PaymentButton';
-import PaymentStatus from '../components/PaymentStatus';
 import UserProfileMenu from "../components/UserProfileMenu";
 import { COLORS, THEME } from "../constants/theme";
 import { supabase } from "../supabase";
@@ -29,12 +28,12 @@ type RootStackParamList = {
   VoiceToText: undefined;
   VoiceToVoice: undefined;
   VideoToVoice: undefined;
-  ComingSoon: undefined;
   ChatBot: undefined;
   LearnANewLanguage: undefined;
   ForgotPassword: undefined;
   LiveAgent: undefined;
-  CryptoSelection: undefined;
+  TranslationHistory: undefined; // Added since it exists in AppNavigator
+  DebugWordLimit: undefined; // Added since it exists in AppNavigator
 };
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
@@ -102,6 +101,33 @@ export default function HomeScreen({ navigation }: Props) {
     console.log("Delete account clicked");
   };
 
+  // 🟢 ADDED: Function to open website for registration
+  const handleRegisterRedirect = async () => {
+    try {
+      const url = "https://www.lauritalk.com/register";
+      const supported = await Linking.canOpenURL(url);
+      
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        console.log("Cannot open URL:", url);
+      }
+    } catch (error) {
+      console.error("Error opening URL:", error);
+    }
+  };
+
+  // 🟢 UPDATED: Function to handle Translate button press
+  const handleTranslatePress = () => {
+    if (isLoggedIn) {
+      // User is logged in, navigate to TranslationOptions
+      navigation.navigate("TranslationOptions");
+    } else {
+      // User is logged out, navigate to Login screen
+      navigation.navigate("Login");
+    }
+  };
+
   // ----------------- Blinking AI Chatbot Animation -----------------
   const blinkAnim = useRef(new Animated.Value(1)).current;
 
@@ -137,6 +163,50 @@ export default function HomeScreen({ navigation }: Props) {
         Animated.timing(micScale, {
           toValue: 1,
           duration: 900,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  // ----------------- Glowing Gold Border Animation for Translate Button -----------------
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  // ----------------- Breathing Gold Line Animation for Mic Icon -----------------
+  const micGlowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(micGlowAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+        Animated.timing(micGlowAnim, {
+          toValue: 0,
+          duration: 2000,
           easing: Easing.ease,
           useNativeDriver: true,
         }),
@@ -186,6 +256,26 @@ export default function HomeScreen({ navigation }: Props) {
     });
   }, []);
 
+  const glowInterpolate = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.3]
+  });
+
+  const shadowInterpolate = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [8, 20]
+  });
+
+  const micGlowInterpolate = micGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 1]
+  });
+
+  const micShadowInterpolate = micGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [5, 15]
+  });
+
   return (
     <View style={styles.container}>
       {/* ---------- FLOATING BACKGROUND SYMBOLS ---------- */}
@@ -208,20 +298,22 @@ export default function HomeScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.appName}>Lauritalk</Text>
-          {isLoggedIn && <PaymentStatus />}
         </View>
 
-        <TouchableOpacity
-          style={styles.profileIconContainer}
-          onPress={() => setMenuVisible(true)}
-        >
-          <Image
-            source={{
-              uri: "https://cdn-icons-png.flaticon.com/512/847/847969.png",
-            }}
-            style={styles.profileIcon}
-          />
-        </TouchableOpacity>
+        {/* Profile Icon - Only show when user is logged in */}
+        {isLoggedIn && (
+          <TouchableOpacity
+            style={styles.profileIconContainer}
+            onPress={() => setMenuVisible(true)}
+          >
+            <Image
+              source={{
+                uri: "https://cdn-icons-png.flaticon.com/512/847/847969.png",
+              }}
+              style={styles.profileIcon}
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ---------- MAIN CONTENT ---------- */}
@@ -230,62 +322,116 @@ export default function HomeScreen({ navigation }: Props) {
           {isLoggedIn ? "Welcome back to Lauritalk!" : "Welcome to Lauritalk"}
         </Text>
 
-        {/* 🎤 Breathing Mic Button */}
+        {/* 🎤 3D Bowling Ball Mic Button with Glass Reflection and Breathing Gold Line - Larger Size */}
         <Animated.View style={[styles.micButton, { transform: [{ scale: micScale }] }]}>
-          <TouchableOpacity onPress={() => navigation.navigate("VoiceToVoice")}>
-            <Ionicons name="mic" size={60} color={COLORS.gold} />
+          <View style={styles.micButton3D}>
+            {/* Main mic button - Bowling Ball Style */}
+            <Animated.View style={[
+              styles.micBase,
+              {
+                shadowOpacity: micGlowInterpolate,
+                elevation: micShadowInterpolate
+              }
+            ]}>
+              {/* Bowling Ball Finger Holes */}
+              <View style={styles.bowlingHole1} />
+              <View style={styles.bowlingHole2} />
+              <View style={styles.bowlingHole3} />
+              
+              {/* Gold glow effect */}
+              <Animated.View style={[
+                styles.micGoldGlow,
+                {
+                  opacity: micGlowInterpolate,
+                  shadowOpacity: micGlowInterpolate
+                }
+              ]} />
+              
+              {/* Glass reflection effect */}
+              <View style={styles.glassReflection} />
+              
+              <TouchableOpacity 
+                style={styles.micTouchable}
+                onPress={() => {
+                  if (isLoggedIn) {
+                    navigation.navigate("VoiceToVoice");
+                  } else {
+                    navigation.navigate("Login");
+                  }
+                }}
+              >
+                <Ionicons name="mic" size={70} color={COLORS.gold} />
+              </TouchableOpacity>
+            </Animated.View>
+            {/* 3D shadow effect */}
+            <View style={styles.micShadow} />
+          </View>
+        </Animated.View>
+
+        {/* Translate Button with Glowing Gold Breathing Effect */}
+        <Animated.View style={[
+          styles.translateButtonContainer, 
+          { 
+            shadowOpacity: glowAnim,
+            elevation: shadowInterpolate
+          }
+        ]}>
+          <TouchableOpacity
+            style={styles.translateButton}
+            onPress={handleTranslatePress}
+          >
+            <View style={styles.translateButtonInner}>
+              <Text style={styles.translateButtonText}>Translate</Text>
+            </View>
+            <Animated.View style={[
+              styles.goldGlow,
+              {
+                shadowOpacity: glowAnim,
+                shadowRadius: shadowInterpolate
+              }
+            ]} />
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Translate Button */}
-        <TouchableOpacity
-          style={styles.translateButton}
-          onPress={() => navigation.navigate("TranslationOptions")}
-        >
-          <Text style={styles.translateButtonText}>Translate</Text>
-        </TouchableOpacity>
-
-        {/* ✅ Learn a New Language Button */}
-        <TouchableOpacity
-          style={[styles.translateButton, { marginTop: 15, backgroundColor: COLORS.forestGreen }]}
-          onPress={() => navigation.navigate("LearnANewLanguage")}
-        >
-          <Text style={[styles.translateButtonText, { color: COLORS.gold }]}>
-            Learn a New Language
-          </Text>
-        </TouchableOpacity>
-
-        {/* 🟢 ADDED: Payment Button - Only show when logged in */}
-        {isLoggedIn && <PaymentButton />}
+        {/* ✅ Learn a New Language Button - Only show when logged in with Royal Blue border */}
+        {isLoggedIn && (
+          <TouchableOpacity
+            style={[styles.learnLanguageButton, { marginTop: 15, backgroundColor: COLORS.forestGreen }]}
+            onPress={() => navigation.navigate("LearnANewLanguage")}
+          >
+            <Text style={[styles.learnLanguageButtonText, { color: COLORS.gold }]}>
+              Learn a New Language
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* 🟢 MODIFIED: Login, Register, Settings - Conditionally rendered */}
         <View style={styles.bottomButtons}>
           {!isLoggedIn ? (
             <>
               <TouchableOpacity
-                style={styles.smallButton}
+                style={[styles.smallButton, styles.loginButton]}
                 onPress={() => navigation.navigate("Login")}
               >
                 <Text style={styles.smallButtonText}>Login</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.smallButton}
-                onPress={() => navigation.navigate("Register")}
+                style={[styles.smallButton, styles.registerButton]}
+                onPress={handleRegisterRedirect}
               >
                 <Text style={styles.smallButtonText}>Register</Text>
               </TouchableOpacity>
             </>
           ) : (
-            <Text style={styles.welcomeMessage}>You're logged in! 🎉</Text>
+            // Settings Button centered when logged in
+            <TouchableOpacity
+              style={[styles.smallButton, { backgroundColor: COLORS.forestGreen }]}
+              onPress={() => navigation.navigate("Settings")}
+            >
+              <Text style={styles.smallButtonText}>Settings</Text>
+            </TouchableOpacity>
           )}
-          
-          <TouchableOpacity
-            style={[styles.smallButton, { backgroundColor: COLORS.forestGreen }]}
-            onPress={() => navigation.navigate("Settings")}
-          >
-            <Text style={styles.smallButtonText}>Settings</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -300,11 +446,17 @@ export default function HomeScreen({ navigation }: Props) {
         isLoggedIn={isLoggedIn}
       />
 
-      {/* ---------- BLINKING AI CHATBOT ICON ---------- */}
+      {/* ---------- BLINKING AI CHATBOT ICON (ORIGINAL) ---------- */}
       <Animated.View
         style={[styles.chatbotIconContainer, { opacity: blinkAnim }]}
       >
-        <TouchableOpacity onPress={() => navigation.navigate("ChatBot")}>
+        <TouchableOpacity onPress={() => {
+          if (isLoggedIn) {
+            navigation.navigate("ChatBot");
+          } else {
+            navigation.navigate("Login");
+          }
+        }}>
           <Ionicons name="chatbubbles" size={60} color={COLORS.gold} />
         </TouchableOpacity>
       </Animated.View>
@@ -315,7 +467,7 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.background,
+    backgroundColor: '#0A0A0A', // Shiny black background
     paddingTop: 50,
   },
   symbol: {
@@ -364,38 +516,154 @@ const styles = StyleSheet.create({
     color: THEME.text,
     marginBottom: 40,
   },
-  welcomeMessage: {
-    color: COLORS.gold,
-    fontSize: 16,
-    fontWeight: "600",
-    marginHorizontal: 10,
-  },
   micButton: {
+    marginBottom: 40,
+  },
+  micButton3D: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micBase: {
     backgroundColor: COLORS.black,
     borderRadius: 100,
-    padding: 25,
-    marginBottom: 40,
+    padding: 30,
     borderWidth: 3,
     borderColor: COLORS.gold,
     shadowColor: COLORS.gold,
-    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  // Bowling Ball Finger Holes
+  bowlingHole1: {
+    position: 'absolute',
+    top: '30%',
+    left: '40%',
+    width: 8,
+    height: 8,
+    backgroundColor: '#333',
+    borderRadius: 4,
+    zIndex: 3,
+  },
+  bowlingHole2: {
+    position: 'absolute',
+    top: '45%',
+    left: '30%',
+    width: 8,
+    height: 8,
+    backgroundColor: '#333',
+    borderRadius: 4,
+    zIndex: 3,
+  },
+  bowlingHole3: {
+    position: 'absolute',
+    top: '45%',
+    left: '50%',
+    width: 8,
+    height: 8,
+    backgroundColor: '#333',
+    borderRadius: 4,
+    zIndex: 3,
+  },
+  micGoldGlow: {
+    position: 'absolute',
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 103,
+    borderWidth: 2,
+    borderColor: COLORS.gold,
+    backgroundColor: 'transparent',
+    shadowColor: COLORS.gold,
+    shadowOffset: { width: 0, height: 0 },
     shadowRadius: 10,
+  },
+  glassReflection: {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    right: 5,
+    height: '30%',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 50,
+    zIndex: 1,
+  },
+  micTouchable: {
+    zIndex: 2,
+  },
+  micShadow: {
+    width: 90,
+    height: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 45,
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  translateButtonContainer: {
+    shadowColor: COLORS.gold,
     shadowOffset: { width: 0, height: 0 },
   },
   translateButton: {
-    backgroundColor: COLORS.gold,
-    paddingVertical: 15,
-    paddingHorizontal: 50,
-    borderRadius: 30,
+    backgroundColor: COLORS.black,
+    paddingVertical: 18,
+    paddingHorizontal: 80,
+    borderRadius: 35,
+    borderWidth: 2,
+    borderColor: COLORS.gold,
+    shadowColor: COLORS.gold,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  translateButtonInner: {
+    zIndex: 2,
+    position: 'relative',
+  },
+  goldGlow: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 35,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    shadowColor: COLORS.gold,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  translateButtonText: {
+    color: COLORS.gold,
+    fontWeight: "bold",
+    fontSize: 20,
+    textAlign: 'center',
+  },
+  learnLanguageButton: {
+    backgroundColor: COLORS.forestGreen,
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#4169E1',
     shadowColor: COLORS.black,
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
   },
-  translateButtonText: {
-    color: COLORS.black,
+  learnLanguageButtonText: {
+    color: COLORS.gold,
     fontWeight: "bold",
-    fontSize: 18,
+    fontSize: 16,
+    textAlign: 'center',
   },
   bottomButtons: {
     flexDirection: "row",
@@ -404,12 +672,21 @@ const styles = StyleSheet.create({
     gap: 15,
     marginTop: 30,
     marginBottom: 80,
+    width: '100%',
   },
   smallButton: {
     backgroundColor: COLORS.black,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 25,
+  },
+  loginButton: {
+    borderWidth: 2,
+    borderColor: '#4169E1',
+  },
+  registerButton: {
+    borderWidth: 2,
+    borderColor: COLORS.forestGreen,
   },
   smallButtonText: {
     color: COLORS.gold,

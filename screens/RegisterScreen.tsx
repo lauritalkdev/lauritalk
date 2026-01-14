@@ -68,7 +68,7 @@ export default function RegisterScreen({ navigation }: any) {
       Alert.alert("Email Required", "Please enter your email.");
       return;
     }
-    if (!country.trim()) { // 🟢 ADDED: Country validation
+    if (!country.trim()) {
       Alert.alert("Country Required", "Please enter your country.");
       return;
     }
@@ -82,40 +82,64 @@ export default function RegisterScreen({ navigation }: any) {
     }
 
     try {
-      // 🟢 ADDED: Check if referral code exists and find the referrer
+      console.log('🚀 Starting registration process...');
+      
+      // 🟢 DEBUG: Check if referral code was provided
       let referrerId = null;
       if (referralCode.trim()) {
-        console.log('Checking referral code:', referralCode.trim());
+        console.log('📋 Referral code provided:', referralCode.trim());
         
-        // Find the user who owns this referral code by checking user metadata
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('raw_user_meta_data->>referral_code', referralCode.trim())
+        // 🟢 DEBUG: Check profiles table for the referral code
+        console.log('🔍 Searching for referrer in profiles table...');
+        const { data: referrerData, error: referrerError } = await supabase
+          .from('profiles')
+          .select('id, referral_code')
+          .eq('referral_code', referralCode.trim())
           .single();
 
-        if (!usersError && usersData) {
-          referrerId = usersData.id;
-          console.log('Found referrer:', referrerId);
+        console.log('📊 Referral search results:', {
+          referrerData,
+          referrerError,
+          hasData: !!referrerData,
+          hasError: !!referrerError
+        });
+
+        if (!referrerError && referrerData) {
+          referrerId = referrerData.id;
+          console.log('✅ Found referrer:', referrerId);
         } else {
-          console.log('No referrer found for code:', referralCode.trim());
+          console.log('❌ No referrer found for code:', referralCode.trim());
+          if (referrerError) {
+            console.log('🔴 Referral lookup error:', referrerError);
+          }
         }
+      } else {
+        console.log('📭 No referral code provided');
       }
 
       // Generate a referral code for the new user
       const newUserReferralCode = generateReferralCode();
+      console.log('🎯 Generated new user referral code:', newUserReferralCode);
 
       // Supabase sign-up
+      console.log('👤 Creating user account...');
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
         options: {
           data: { 
             full_name: name.trim(),
-            country: country.trim(), // 🟢 ADDED: Include country in user data
-            referral_code: newUserReferralCode // 🟢 UPDATED: Give new user their own code
+            country: country.trim(),
+            referral_code: newUserReferralCode
           },
         },
+      });
+
+      console.log('📋 Signup response:', {
+        hasData: !!data,
+        hasUser: !!data?.user,
+        hasError: !!error,
+        error: error
       });
 
       if (error) {
@@ -126,28 +150,46 @@ export default function RegisterScreen({ navigation }: any) {
         return;
       }
 
-      // 🟢 ADDED: Record the referral if a valid code was used
+      // 🟢 DEBUG: Record the referral if a valid code was used
       if (data?.user && referrerId) {
-        console.log('Recording referral for user:', data.user.id);
+        console.log('📝 Creating referral record...', {
+          referrerId,
+          referredUserId: data.user.id,
+          referralCode: referralCode.trim()
+        });
         
-        const { error: referralError } = await supabase
+        const { data: referralResult, error: referralError } = await supabase
           .from('user_referrals')
           .insert({
             referrer_id: referrerId,
             referred_user_id: data.user.id,
             referral_code: referralCode.trim(),
             user_type: 'freemium'
-          });
+          })
+          .select(); // 🟢 ADDED: This returns the inserted row
+
+        console.log('📊 Referral creation result:', {
+          referralResult,
+          referralError,
+          hasResult: !!referralResult,
+          hasError: !!referralError
+        });
 
         if (referralError) {
-          console.error('Error recording referral:', referralError);
+          console.error('🔴 Error recording referral:', referralError);
         } else {
-          console.log('Referral recorded successfully!');
+          console.log('✅ Referral recorded successfully!', referralResult);
         }
+      } else {
+        console.log('⏩ Skipping referral creation:', {
+          hasUser: !!data?.user,
+          hasReferrerId: !!referrerId
+        });
       }
 
-      // Optional: auto-login after registration (remove if you want email confirmation)
+      // Auto-login after registration
       if (data?.user) {
+        console.log('🔐 Auto-logging in user...');
         await supabase.auth.signInWithPassword({ email: email.trim(), password });
         Alert.alert("🎉 Registration Successful", "Welcome to Lauritalk!");
         navigation.replace("Home");
@@ -159,6 +201,7 @@ export default function RegisterScreen({ navigation }: any) {
         navigation.replace("Login");
       }
     } catch (err: any) {
+      console.error('💥 Registration error:', err);
       Alert.alert("Unexpected Error", err.message || "Something went wrong.");
     }
   };

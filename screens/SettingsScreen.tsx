@@ -6,7 +6,6 @@ import {
   Alert,
   Dimensions,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,40 +14,17 @@ import {
 
 const { width, height } = Dimensions.get("window");
 
-// ✅ Define your navigation stack types
+// ✅ Updated RootStackParamList with only needed screens
 type RootStackParamList = {
-  HelpCentre: undefined;
   FAQ: undefined;
+  TermsAndConditions: undefined;
+  PrivacyPolicy: undefined;
 };
 
 type SettingsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function SettingsScreen() {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
-
-  const handleShareWithFriends = async () => {
-    try {
-      const referralCode = generateReferralCode();
-      const shareLink = `https://lauritalk.com/invite/${referralCode}`;
-      const shareMessage = `Join me on Lauritalk - the ultimate translation app! Use my referral code: ${referralCode} or click: ${shareLink}\n\nGet 10% off your first premium subscription!`;
-
-      await Share.share({
-        message: shareMessage,
-        title: "Join Lauritalk - Get 10% Off!",
-      });
-    } catch {
-      Alert.alert("Error", "Failed to share referral link");
-    }
-  };
-
-  const generateReferralCode = (): string => {
-    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let code = "";
-    for (let i = 0; i < 6; i++) {
-      code += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return `LAURI${code}`;
-  };
 
   const handle2FASetup = () => {
     Alert.alert(
@@ -87,41 +63,21 @@ export default function SettingsScreen() {
     );
   };
 
-  // ✅ Typed settings options list
+  // ✅ Updated settings options with removed buttons
   const settingsOptions: {
     icon: keyof typeof Ionicons.glyphMap;
     title: string;
     onPress: () => void;
   }[] = [
     {
-      icon: "help-circle-outline",
-      title: "Help Centre",
-      onPress: () => navigation.navigate("HelpCentre"),
-    },
-    {
-      icon: "share-social-outline",
-      title: "Share with Friends",
-      onPress: handleShareWithFriends,
-    },
-    {
       icon: "lock-closed-outline",
       title: "Privacy Policy",
-      onPress: () => Alert.alert("Coming Soon", "This feature is not functional yet."),
+      onPress: () => navigation.navigate("PrivacyPolicy"),
     },
     {
       icon: "document-text-outline",
       title: "Terms and Conditions",
-      onPress: () => Alert.alert("Coming Soon", "This feature is not functional yet."),
-    },
-    {
-      icon: "person-outline",
-      title: "Publisher Info",
-      onPress: () => Alert.alert("Coming Soon", "This feature is not functional yet."),
-    },
-    {
-      icon: "code-working-outline",
-      title: "Open Source Licenses",
-      onPress: () => Alert.alert("Coming Soon", "This feature is not functional yet."),
+      onPress: () => navigation.navigate("TermsAndConditions"),
     },
     {
       icon: "shield-checkmark-outline",

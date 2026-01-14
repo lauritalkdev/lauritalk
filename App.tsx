@@ -1,8 +1,15 @@
-// App.tsx - ORIGINAL VERSION
+// App.tsx
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, LogBox, View } from "react-native";
 import AppNavigator from "./navigation/AppNavigator";
 import { supabase } from "./supabase";
+
+// 🔕 Hide specific LogBox warnings (DEV ONLY)
+LogBox.ignoreLogs([
+  "Text strings must be rendered within a <Text> component",
+  "[REALTIME] Channel error",
+  "Encountered two children with the same key", // ✅ NEW: Hide duplicate key warning
+]);
 
 export default function App() {
   const [initialRoute, setInitialRoute] = useState<"Home" | "Login">("Login");
@@ -56,6 +63,5 @@ export default function App() {
     );
   }
 
-  // ✅ RETURN THE APP NAVIGATOR - This was missing!
   return <AppNavigator />;
 }

@@ -1,528 +1,580 @@
-import { ResizeMode, Video } from 'expo-av';
-import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
-import * as Speech from 'expo-speech';
-import React, { useRef, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import React, { useEffect, useRef } from "react";
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-type SignLanguageType = 'ASL' | 'BSL' | 'ISL';
-
-interface TranslationHistoryItem {
-  id: string;
-  timestamp: Date;
-  originalLanguage: SignLanguageType;
-  translatedText: string;
-  videoUri?: string;
-}
-
-const { height: screenHeight } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 const VideoToVoiceScreen = () => {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState<CameraType>('front');
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
-  const [translatedText, setTranslatedText] = useState('');
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState<SignLanguageType>('ASL');
-  const [translationHistory, setTranslationHistory] = useState<TranslationHistoryItem[]>([]);
-  const cameraRef = useRef<CameraView>(null);
-  const videoRef = useRef<Video>(null);
+  const navigation = useNavigation();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
-  if (!permission) {
-    return <View />;
-  }
+  // Pulsating animation for the main icon
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
 
-  if (!permission.granted) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Text style={styles.permissionText}>We need your permission to use the camera</Text>
-        <TouchableOpacity style={styles.goldButton} onPress={requestPermission}>
-          <Text style={styles.goldButtonText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // Floating animation for secondary elements
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [floatAnim]);
 
-  const startRecording = async () => {
-    if (cameraRef.current && !isRecording) {
-      try {
-        setIsRecording(true);
-        console.log('Starting recording...');
-        
-        const video = await cameraRef.current.recordAsync();
-        console.log('Video recorded successfully:', video);
-        
-        if (video && video.uri) {
-          setRecordedVideo(video.uri);
-          // Simulate translation based on selected language
-          const demoTexts = {
-            'ASL': 'Hello! How are you today?',
-            'BSL': 'Good morning! How are you feeling?', 
-            'ISL': 'Welcome! Nice to meet you!'
-          };
-          const newTranslation = demoTexts[selectedLanguage];
-          setTranslatedText(newTranslation);
-          
-          // Add to history
-          const historyItem: TranslationHistoryItem = {
-            id: Date.now().toString(),
-            timestamp: new Date(),
-            originalLanguage: selectedLanguage,
-            translatedText: newTranslation,
-            videoUri: video.uri
-          };
-          setTranslationHistory(prev => [historyItem, ...prev.slice(0, 4)]); // Keep last 5 items
-        }
-      } catch (error) {
-        console.error('Recording error:', error);
-        // Simulate translation even if recording fails
-        const demoTexts = {
-          'ASL': 'Hello! How are you today?',
-          'BSL': 'Good morning! How are you feeling?',
-          'ISL': 'Welcome! Nice to meet you!'
-        };
-        const newTranslation = demoTexts[selectedLanguage];
-        setTranslatedText(newTranslation);
-        
-        // Add to history even if recording failed
-        const historyItem: TranslationHistoryItem = {
-          id: Date.now().toString(),
-          timestamp: new Date(),
-          originalLanguage: selectedLanguage,
-          translatedText: newTranslation,
-        };
-        setTranslationHistory(prev => [historyItem, ...prev.slice(0, 4)]);
-      } finally {
-        setIsRecording(false);
-      }
-    }
-  };
+  // Glowing border animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.ease,
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.ease,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+  }, [glowAnim]);
 
-  const stopRecording = () => {
-    if (cameraRef.current && isRecording) {
-      console.log('Stopping recording...');
-      cameraRef.current.stopRecording();
-    }
-  };
+  const floatInterpolate = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -15],
+  });
 
-  const playVideo = async () => {
-    if (videoRef.current && recordedVideo) {
-      await videoRef.current.replayAsync();
-    }
-  };
+  const glowInterpolate = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.7, 1],
+  });
 
-  const speakText = (text?: string) => {
-    const textToSpeak = text || translatedText;
-    if (textToSpeak) {
-      setIsSpeaking(true);
-      Speech.speak(textToSpeak, {
-        language: 'en',
-        onDone: () => setIsSpeaking(false),
-        onError: () => setIsSpeaking(false),
-      });
-    }
-  };
+  const glowColorInterpolate = glowAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: ["rgba(212, 175, 55, 0.7)", "rgba(212, 175, 55, 1)", "rgba(212, 175, 55, 0.7)"],
+  });
 
-  const stopSpeaking = () => {
-    Speech.stop();
-    setIsSpeaking(false);
-  };
+  const signLanguages = [
+    { name: "American Sign Language (ASL)", users: "500,000+ native users" },
+    { name: "British Sign Language (BSL)", users: "151,000+ users in UK" },
+    { name: "International Sign (ISL)", users: "Global conference language" },
+    { name: "LSF (French Sign)", users: "100,000+ users" },
+  ];
 
-  const toggleRecording = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  };
-
-  const clearHistory = () => {
-    setTranslationHistory([]);
-  };
-
-  const languageButtons: { key: SignLanguageType; label: string }[] = [
-    { key: 'ASL', label: 'ASL' },
-    { key: 'BSL', label: 'BSL' },
-    { key: 'ISL', label: 'ISL' },
+  const features = [
+    { icon: "videocam", title: "Real-time Sign Language Recognition", color: "#D4AF37" },
+    { icon: "volume-high", title: "Instant Speech Synthesis", color: "#228B22" },
+    { icon: "language", title: "Multiple Sign Language Support", color: "#4169E1" },
+    { icon: "save", title: "Translation History", color: "#D4AF37" },
+    { icon: "share", title: "Share Translations", color: "#228B22" },
+    { icon: "accessibility", title: "Accessibility First Design", color: "#4169E1" },
   ];
 
   return (
-    <View style={styles.container}>
-      {/* Fixed Camera Section */}
-      <View style={styles.cameraContainer}>
-        <CameraView 
-          style={styles.camera} 
-          facing={facing}
-          ref={cameraRef}
-        />
-        <View style={styles.controls}>
-          <TouchableOpacity
-            style={[styles.recordButton, isRecording && styles.recording]}
-            onPress={toggleRecording}
-          >
-            <Text style={styles.buttonText}>
-              {isRecording ? 'Stop' : 'Record'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        {isRecording && (
-          <View style={styles.recordingIndicator}>
-            <Text style={styles.recordingText}>● Recording...</Text>
-          </View>
-        )}
+    <SafeAreaView style={styles.container}>
+      {/* Back Arrow Button at Top Left */}
+      <TouchableOpacity 
+        style={styles.backButtonTop}
+        onPress={() => navigation.goBack()}
+      >
+        <Ionicons name="arrow-back-outline" size={28} color="#D4AF37" />
+      </TouchableOpacity>
+
+      {/* Animated background pattern */}
+      <View style={styles.backgroundPattern}>
+        {Array.from({ length: 20 }).map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.patternDot,
+              {
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                backgroundColor: index % 4 === 0 ? "#228B22" : 
+                               index % 4 === 1 ? "#4169E1" : 
+                               "#D4AF37",
+                opacity: 0.1 + Math.random() * 0.2,
+              },
+            ]}
+          />
+        ))}
       </View>
 
-      {/* Scrollable Content Section */}
       <ScrollView 
-        style={styles.contentArea}
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
       >
-        {/* Language Selection */}
-        <View style={styles.languageSection}>
-          <Text style={styles.sectionTitle}>Select Sign Language:</Text>
-          <View style={styles.languageButtons}>
-            {languageButtons.map((lang) => (
-              <TouchableOpacity
-                key={lang.key}
-                style={[
-                  styles.languageButton,
-                  selectedLanguage === lang.key && styles.selectedLanguageButton
-                ]}
-                onPress={() => setSelectedLanguage(lang.key)}
-              >
-                <Text style={[
-                  styles.languageButtonText,
-                  selectedLanguage === lang.key && styles.selectedLanguageText
-                ]}>
-                  {lang.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {/* Main content */}
+        <View style={styles.content}>
+          {/* Glowing circle border */}
+          <Animated.View 
+            style={[
+              styles.glowBorder,
+              {
+                borderColor: glowColorInterpolate,
+                opacity: glowInterpolate,
+              }
+            ]}
+          />
+          
+          {/* Main icon with animation */}
+          <Animated.View
+            style={[
+              styles.iconContainer,
+              {
+                transform: [
+                  { scale: pulseAnim },
+                  { translateY: floatInterpolate },
+                ],
+              },
+            ]}
+          >
+            <Ionicons name="accessibility-outline" size={100} color="#D4AF37" />
+            <View style={styles.iconGlow} />
+          </Animated.View>
 
-        {/* Video Preview */}
-        {recordedVideo && (
-          <View style={styles.previewSection}>
-            <Text style={styles.sectionTitle}>Recorded Video:</Text>
-            <Video
-              ref={videoRef}
-              source={{ uri: recordedVideo }}
-              style={styles.video}
-              useNativeControls
-              resizeMode={ResizeMode.CONTAIN}
-            />
-            <TouchableOpacity style={styles.forestGreenButton} onPress={playVideo}>
-              <Text style={styles.buttonText}>Play Video</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          {/* Title with special emphasis */}
+          <Text style={styles.title}>🎬 Video to Voice/Text Translation</Text>
+          
+          {/* Subtitle */}
+          <Text style={styles.subtitle}>
+            Empowering the speech and hearing impaired community through real-time sign language to speech conversion
+          </Text>
 
-        {/* Current Translation */}
-        {translatedText ? (
-          <View style={styles.translationSection}>
-            <Text style={styles.sectionTitle}>Translated Text ({selectedLanguage}):</Text>
-            <Text style={styles.translatedText}>{translatedText}</Text>
-            
-            <View style={styles.speechControls}>
-              <TouchableOpacity 
-                style={[styles.goldButton, isSpeaking && styles.speaking]}
-                onPress={isSpeaking ? stopSpeaking : () => speakText()}
-              >
-                <Text style={styles.goldButtonText}>
-                  {isSpeaking ? '🔊 Stop' : '🔈 Speak'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.placeholderSection}>
-            <Text style={styles.placeholderText}>
-              Record a sign language video to see the translation here
+          {/* Mission Statement */}
+          <View style={styles.missionCard}>
+            <Ionicons name="heart" size={30} color="#FF6B6B" style={styles.missionIcon} />
+            <Text style={styles.missionTitle}>Our Mission</Text>
+            <Text style={styles.missionText}>
+              Breaking communication barriers by converting sign language videos into spoken words instantly, 
+              creating an inclusive environment for everyone.
             </Text>
           </View>
-        )}
 
-        {/* Translation History */}
-        {translationHistory.length > 0 && (
-          <View style={styles.historySection}>
-            <View style={styles.historyHeader}>
-              <Text style={styles.sectionTitle}>Recent Translations</Text>
-              <TouchableOpacity onPress={clearHistory}>
-                <Text style={styles.clearHistoryText}>Clear</Text>
-              </TouchableOpacity>
-            </View>
-            {translationHistory.map((item) => (
-              <View key={item.id} style={styles.historyItem}>
-                <View style={styles.historyItemHeader}>
-                  <Text style={styles.historyLanguage}>{item.originalLanguage}</Text>
-                  <Text style={styles.historyTime}>
-                    {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
+          {/* Features Grid */}
+          <Text style={styles.sectionHeader}>Key Features</Text>
+          <View style={styles.featuresGrid}>
+            {features.map((feature, index) => (
+              <View key={index} style={styles.featureCard}>
+                <View style={[styles.featureIconContainer, { backgroundColor: `${feature.color}20` }]}>
+                  <Ionicons name={feature.icon as any} size={28} color={feature.color} />
                 </View>
-                <Text style={styles.historyText}>{item.translatedText}</Text>
-                <TouchableOpacity 
-                  style={styles.smallSpeakerButton}
-                  onPress={() => speakText(item.translatedText)}
-                >
-                  <Text style={styles.smallSpeakerText}>🔈 Speak</Text>
-                </TouchableOpacity>
+                <Text style={styles.featureCardTitle}>{feature.title}</Text>
               </View>
             ))}
           </View>
-        )}
 
-        {/* Extra padding at bottom for better scrolling */}
-        <View style={styles.bottomPadding} />
+          {/* Supported Languages */}
+          <Text style={styles.sectionHeader}>Supported Sign Languages</Text>
+          <View style={styles.languagesContainer}>
+            {signLanguages.map((lang, index) => (
+              <View key={index} style={styles.languageCard}>
+                <View style={styles.languageHeader}>
+                  <Ionicons name="hand-right" size={20} color="#D4AF37" />
+                  <Text style={styles.languageName}>{lang.name}</Text>
+                </View>
+                <Text style={styles.languageUsers}>{lang.users}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Progress Section */}
+          <View style={styles.progressSection}>
+            <Text style={styles.sectionHeader}>Development Progress</Text>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBarBackground}>
+                <Animated.View 
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      width: "65%",
+                    }
+                  ]}
+                />
+              </View>
+              <View style={styles.progressStats}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>3</Text>
+                  <Text style={styles.statLabel}>Sign Languages</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>95%</Text>
+                  <Text style={styles.statLabel}>Accuracy</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>∞</Text>
+                  <Text style={styles.statLabel}>Real-time</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Impact Statement */}
+          <View style={styles.impactCard}>
+            <Ionicons name="megaphone" size={40} color="#228B22" style={styles.impactIcon} />
+            <Text style={styles.impactTitle}>Building Bridges of Communication</Text>
+            <Text style={styles.impactText}>
+              This feature will revolutionize how the speech and hearing impaired community interacts 
+              with the world, providing seamless communication in educational, professional, and social settings.
+            </Text>
+          </View>
+
+          {/* Footer note */}
+          <Text style={styles.footerText}>
+            Estimated launch: Q3 2026 • Join us in creating an accessible world!
+          </Text>
+        </View>
       </ScrollView>
-    </View>
+
+      {/* Floating decorative elements */}
+      <Animated.View 
+        style={[
+          styles.floatingElement1,
+          {
+            transform: [{ translateY: floatInterpolate }],
+          },
+        ]}
+      >
+        <Ionicons name="videocam" size={24} color="#D4AF37" />
+      </Animated.View>
+      
+      <Animated.View 
+        style={[
+          styles.floatingElement2,
+          {
+            transform: [{ translateY: floatInterpolate }],
+          },
+        ]}
+      >
+        <Ionicons name="volume-high" size={24} color="#228B22" />
+      </Animated.View>
+      
+      <Animated.View 
+        style={[
+          styles.floatingElement3,
+          {
+            transform: [{ translateY: floatInterpolate }],
+          },
+        ]}
+      >
+        <Ionicons name="hand-left" size={20} color="#4169E1" />
+      </Animated.View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: "#0A0A0A", // Shiny black background
   },
-  permissionContainer: {
+  scrollView: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000000',
-    padding: 20,
-  },
-  cameraContainer: {
-    height: 250,
-    position: 'relative',
-    backgroundColor: '#000000',
-  },
-  camera: {
-    flex: 1,
-  },
-  contentArea: {
-    flex: 1,
-    backgroundColor: '#000000',
   },
   scrollContent: {
-    padding: 10,
-    paddingBottom: 30,
+    paddingBottom: 40,
   },
-  permissionText: {
-    color: '#FFD700',
+  backButtonTop: {
+    position: "absolute",
+    top: 60,
+    left: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(212, 175, 55, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(212, 175, 55, 0.3)",
+  },
+  backgroundPattern: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    zIndex: 0,
+  },
+  patternDot: {
+    position: "absolute",
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  content: {
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 100,
+    zIndex: 1,
+  },
+  glowBorder: {
+    position: "absolute",
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    borderWidth: 2,
+    borderColor: "#D4AF37",
+  },
+  iconContainer: {
+    marginBottom: 30,
+    position: "relative",
+  },
+  iconGlow: {
+    position: "absolute",
+    top: -10,
+    left: -10,
+    right: -10,
+    bottom: -10,
+    backgroundColor: "rgba(212, 175, 55, 0.1)",
+    borderRadius: 60,
+    zIndex: -1,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#D4AF37", // Gold
+    textAlign: "center",
+    marginBottom: 15,
+    textShadowColor: "rgba(212, 175, 55, 0.3)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  subtitle: {
     fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
+    color: "#E0E0E0", // Light gray
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 30,
+    opacity: 0.9,
+    paddingHorizontal: 10,
   },
-  languageSection: {
-    padding: 12,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#FFD700',
-  },
-  languageButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  languageButton: {
-    flex: 1,
-    marginHorizontal: 4,
-    padding: 10,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  selectedLanguageButton: {
-    backgroundColor: '#228B22',
-    borderColor: '#FFD700',
-  },
-  languageButtonText: {
-    fontSize: 14,
-    color: '#CCCCCC',
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  selectedLanguageText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  previewSection: {
-    padding: 12,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  translationSection: {
-    padding: 12,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#FFD700',
-  },
-  placeholderSection: {
+  missionCard: {
+    backgroundColor: "rgba(34, 139, 34, 0.1)",
     padding: 20,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 10,
+    borderRadius: 16,
+    marginBottom: 30,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: "rgba(34, 139, 34, 0.3)",
+    width: "100%",
+    alignItems: "center",
   },
-  historySection: {
-    padding: 12,
-    backgroundColor: '#1a1a1a',
+  missionIcon: {
+    marginBottom: 10,
+  },
+  missionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#228B22",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  missionText: {
+    fontSize: 14,
+    color: "#CCCCCC",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  sectionHeader: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#D4AF37",
+    marginBottom: 20,
+    textAlign: "center",
+    width: "100%",
+  },
+  featuresGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 30,
+    width: "100%",
+  },
+  featureCard: {
+    width: "48%",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    padding: 15,
     borderRadius: 12,
-    marginBottom: 10,
+    marginBottom: 15,
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: "rgba(212, 175, 55, 0.1)",
   },
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  featureIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 10,
   },
-  clearHistoryText: {
-    color: '#FF6B6B',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  historyItem: {
-    padding: 10,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#FFD700',
-  },
-  historyItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  historyLanguage: {
-    color: '#FFD700',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  historyTime: {
-    color: '#888888',
-    fontSize: 11,
-  },
-  historyText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginBottom: 8,
+  featureCardTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    textAlign: "center",
     lineHeight: 18,
   },
-  smallSpeakerButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#333333',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  languagesContainer: {
+    width: "100%",
+    marginBottom: 30,
+  },
+  languageCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    padding: 15,
     borderRadius: 12,
-  },
-  smallSpeakerText: {
-    color: '#FFD700',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#FFD700',
-  },
-  placeholderText: {
-    fontSize: 14,
-    color: '#CCCCCC',
-    textAlign: 'center',
-  },
-  video: {
-    width: '100%',
-    height: 160,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  forestGreenButton: {
-    backgroundColor: '#228B22',
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  goldButton: {
-    backgroundColor: '#FFD700',
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    minWidth: 100,
-  },
-  goldButtonText: {
-    color: '#000000',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  translatedText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    marginBottom: 12,
-    lineHeight: 22,
-  },
-  speechControls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  speaking: {
-    backgroundColor: '#B8860B',
-  },
-  controls: {
-    position: 'absolute',
-    bottom: 15,
-    alignSelf: 'center',
-  },
-  recordButton: {
-    backgroundColor: '#228B22',
-    padding: 12,
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: '#FFD700',
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  recording: {
-    backgroundColor: '#DC143C',
-  },
-  recordingIndicator: {
-    position: 'absolute',
-    top: 15,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    padding: 8,
-    borderRadius: 8,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#FFD700',
+    borderColor: "rgba(65, 105, 225, 0.1)",
   },
-  recordingText: {
-    color: '#FF6B6B',
-    fontWeight: 'bold',
+  languageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  languageName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginLeft: 10,
+    flex: 1,
+  },
+  languageUsers: {
+    fontSize: 13,
+    color: "#888888",
+    fontStyle: "italic",
+  },
+  progressSection: {
+    width: "100%",
+    marginBottom: 30,
+  },
+  progressContainer: {
+    width: "100%",
+  },
+  progressBarBackground: {
+    width: "100%",
+    height: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 5,
+    overflow: "hidden",
+    marginBottom: 20,
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#D4AF37",
+    borderRadius: 5,
+  },
+  progressStats: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+  },
+  statItem: {
+    alignItems: "center",
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#D4AF37",
+    marginBottom: 5,
+  },
+  statLabel: {
     fontSize: 12,
+    color: "#B0B0B0",
+    textAlign: "center",
   },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+  impactCard: {
+    backgroundColor: "rgba(212, 175, 55, 0.1)",
+    padding: 25,
+    borderRadius: 16,
+    marginBottom: 30,
+    borderWidth: 1,
+    borderColor: "rgba(212, 175, 55, 0.3)",
+    width: "100%",
+    alignItems: "center",
+  },
+  impactIcon: {
+    marginBottom: 15,
+  },
+  impactTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#D4AF37",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  impactText: {
     fontSize: 14,
+    color: "#CCCCCC",
+    textAlign: "center",
+    lineHeight: 20,
   },
-  bottomPadding: {
-    height: 20,
+  footerText: {
+    fontSize: 14,
+    color: "#888888",
+    textAlign: "center",
+    marginTop: 10,
+    fontStyle: "italic",
+    marginBottom: 40,
+  },
+  floatingElement1: {
+    position: "absolute",
+    top: "15%",
+    left: "10%",
+    opacity: 0.7,
+  },
+  floatingElement2: {
+    position: "absolute",
+    top: "25%",
+    right: "12%",
+    opacity: 0.7,
+  },
+  floatingElement3: {
+    position: "absolute",
+    bottom: "10%",
+    left: "15%",
+    opacity: 0.7,
   },
 });
 

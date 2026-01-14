@@ -1,16 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
+import NetInfo from '@react-native-community/netinfo';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Speech from 'expo-speech';
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  Alert,
+  Animated,
+  Clipboard,
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { ChatMode, getLauribotResponse } from "../services/lauribotService";
 
@@ -18,6 +23,76 @@ import { ChatMode, getLauribotResponse } from "../services/lauribotService";
 type Message = {
   from: "user" | "bot";
   text: string;
+  timestamp: number;
+  id: string;
+};
+
+type NavigationProps = {
+  navigation: {
+    goBack: () => void;
+    navigate: (screen: string) => void;
+  };
+};
+
+// ---------- CONSTANTS (i18n-ready) ----------
+const STRINGS = {
+  header: {
+    title: "Lauribot",
+    supportSubtitle: "Your Support Assistant",
+    exploreSubtitle: "Your Knowledge Partner",
+  },
+  modes: {
+    support: "Support",
+    explore: "Explore",
+  },
+  placeholders: {
+    support: "Ask about Lauritalk features...",
+    explore: "What would you like to know?",
+  },
+  empty: {
+    emoji: "💬",
+    title: "Start a conversation",
+    subtitle: "Ask me about Lauritalk features or anything you'd like to explore!",
+  },
+  welcome: {
+    supportEmoji: "🎯",
+    exploreEmoji: "✨",
+    supportText: "Ready to assist with Lauritalk!",
+    exploreText: "Let's explore something amazing!",
+  },
+  typing: "Lauribot is thinking...",
+  humanAgent: "Connect with Live Agent",
+  footer: {
+    support: "Tap speaker icon to hear responses",
+    explore: "Ask me anything!",
+  },
+  errors: {
+    offline: "You're offline. Please check your connection.",
+    generic: "I'm experiencing technical difficulties. Please try again later.",
+    retryButton: "Retry",
+  },
+  actions: {
+    copy: "Copy",
+    share: "Share",
+    speak: "Speak",
+    regenerate: "Regenerate",
+    copied: "Message copied!",
+  },
+};
+
+const QUICK_REPLIES = {
+  customer_care: [
+    "How do I register?",
+    "What are the features?",
+    "Pricing information",
+    "Technical support",
+  ],
+  ask_me_anything: [
+    "Tell me something interesting",
+    "Explain quantum physics",
+    "Random fact",
+    "What's AI?",
+  ],
 };
 
 // ---------- THEME ----------
@@ -29,84 +104,432 @@ const COLORS = {
   gray: "#222",
   darkGray: "#111",
   lightGold: "#F4E4A2",
+  error: "#FF6B6B",
+  gradientStart: "#D4AF37",
+  gradientEnd: "#F4E4A2",
 };
 
-// ---------- COMPONENT ----------
-export default function ChatBotScreen({ navigation }: any) {
+const ACCESSIBILITY = {
+  minContrastRatio: 4.5, // WCAG AA compliance
+  touchTargetSize: 44, // Minimum touch target
+};
+
+// ---------- UTILITY FUNCTIONS ----------
+const debounce = <T extends (...args: any[]) => any>(
+  func: T,
+  delay: number
+): ((...args: Parameters<T>) => void) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
+const generateId = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+// ---------- SUB-COMPONENTS ----------
+const Header: React.FC<{
+  mode: ChatMode;
+  onBack: () => void;
+}> = ({ mode, onBack }) => (
+  <View style={styles.header}>
+    <TouchableOpacity 
+      style={styles.backButton} 
+      onPress={onBack}
+      accessible={true}
+      accessibilityLabel="Go back"
+      accessibilityRole="button"
+    >
+      <Ionicons name="arrow-back" size={24} color={COLORS.gold} />
+    </TouchableOpacity>
+    
+    <View style={styles.headerCenter}>
+      <Text style={styles.headerTitle}>{STRINGS.header.title}</Text>
+      <Text style={styles.headerSubtitle}>
+        {mode === 'customer_care' 
+          ? `🤖 ${STRINGS.header.supportSubtitle}` 
+          : `🌍 ${STRINGS.header.exploreSubtitle}`}
+      </Text>
+    </View>
+    
+    <View style={styles.headerPlaceholder} />
+  </View>
+);
+
+const ModeSelector: React.FC<{
+  mode: ChatMode;
+  onModeChange: (mode: ChatMode) => void;
+}> = ({ mode, onModeChange }) => (
+  <View style={styles.modeSelector}>
+    <TouchableOpacity 
+      style={[
+        styles.modeButton, 
+        mode === 'customer_care' && styles.modeButtonActive
+      ]}
+      onPress={() => onModeChange('customer_care')}
+      accessible={true}
+      accessibilityLabel="Switch to Support mode"
+      accessibilityRole="button"
+      accessibilityState={{ selected: mode === 'customer_care' }}
+    >
+      <Ionicons 
+        name="headset" 
+        size={16} 
+        color={mode === 'customer_care' ? COLORS.white : COLORS.gold} 
+      />
+      <Text style={[
+        styles.modeButtonText,
+        mode === 'customer_care' && styles.modeButtonTextActive
+      ]}>{STRINGS.modes.support}</Text>
+    </TouchableOpacity>
+    
+    <View style={styles.modeDivider} />
+    
+    <TouchableOpacity 
+      style={[
+        styles.modeButton, 
+        mode === 'ask_me_anything' && styles.modeButtonActive
+      ]}
+      onPress={() => onModeChange('ask_me_anything')}
+      accessible={true}
+      accessibilityLabel="Switch to Explore mode"
+      accessibilityRole="button"
+      accessibilityState={{ selected: mode === 'ask_me_anything' }}
+    >
+      <Ionicons 
+        name="bulb" 
+        size={16} 
+        color={mode === 'ask_me_anything' ? COLORS.white : COLORS.gold} 
+      />
+      <Text style={[
+        styles.modeButtonText,
+        mode === 'ask_me_anything' && styles.modeButtonTextActive
+      ]}>{STRINGS.modes.explore}</Text>
+    </TouchableOpacity>
+  </View>
+);
+
+const TypingIndicator: React.FC = () => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = (dot: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, {
+            toValue: -10,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    animate(dot1, 0);
+    animate(dot2, 150);
+    animate(dot3, 300);
+  }, []);
+
+  return (
+    <View style={styles.typingIndicator}>
+      <LinearGradient
+        colors={[COLORS.gradientStart, COLORS.gradientEnd]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.typingBubble}
+      >
+        <View style={styles.typingDots}>
+          <Animated.View style={[styles.dot, { transform: [{ translateY: dot1 }] }]} />
+          <Animated.View style={[styles.dot, { transform: [{ translateY: dot2 }] }]} />
+          <Animated.View style={[styles.dot, { transform: [{ translateY: dot3 }] }]} />
+        </View>
+        <Text style={styles.typingText}>{STRINGS.typing}</Text>
+      </LinearGradient>
+    </View>
+  );
+};
+
+const ChatBubble: React.FC<{
+  message: Message;
+  isSpeaking: boolean;
+  onToggleSpeech: (text: string) => void;
+  onLongPress: (message: Message) => void;
+  onRegenerate?: (message: Message) => void;
+  mode: ChatMode;
+}> = React.memo(({ message, isSpeaking, onToggleSpeech, onLongPress, onRegenerate, mode }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const BubbleContent = message.from === "bot" ? (
+    <LinearGradient
+      colors={[COLORS.gradientStart, COLORS.gradientEnd]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.messageBubble, styles.botBubbleGradient]}
+    >
+      <Text style={styles.messageText}>{message.text}</Text>
+    </LinearGradient>
+  ) : (
+    <View style={[styles.messageBubble, styles.userBubble]}>
+      <Text style={styles.messageText}>{message.text}</Text>
+    </View>
+  );
+
+  return (
+    <Animated.View 
+      style={[
+        styles.messageWrapper,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      <TouchableOpacity
+        onLongPress={() => onLongPress(message)}
+        activeOpacity={0.7}
+        accessible={true}
+        accessibilityLabel={`${message.from === 'user' ? 'You' : 'Lauribot'} said: ${message.text}`}
+        accessibilityHint="Long press for options"
+      >
+        <View style={[
+          styles.messageRow,
+          message.from === "user" ? styles.userRow : styles.botRow
+        ]}>
+          {message.from === "bot" && (
+            <View style={styles.botAvatar}>
+              <Text style={styles.botAvatarText}>🤖</Text>
+            </View>
+          )}
+          
+          {BubbleContent}
+          
+          {message.from === "bot" && (
+            <View style={styles.messageActions}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => onToggleSpeech(message.text)}
+                accessible={true}
+                accessibilityLabel={isSpeaking ? "Stop speaking" : "Speak message"}
+                accessibilityRole="button"
+              >
+                <Ionicons 
+                  name={isSpeaking ? "volume-mute" : "volume-medium"} 
+                  size={14} 
+                  color={COLORS.white} 
+                />
+              </TouchableOpacity>
+              
+              {onRegenerate && (
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => onRegenerate(message)}
+                  accessible={true}
+                  accessibilityLabel="Regenerate response"
+                  accessibilityRole="button"
+                >
+                  <Ionicons 
+                    name="refresh" 
+                    size={14} 
+                    color={COLORS.white} 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          
+          {message.from === "user" && (
+            <View style={styles.userAvatar}>
+              <Text style={styles.userAvatarText}>👤</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+
+const QuickReplies: React.FC<{
+  mode: ChatMode;
+  onSelect: (text: string) => void;
+}> = ({ mode, onSelect }) => {
+  const replies = QUICK_REPLIES[mode];
+  
+  return (
+    <View style={styles.quickRepliesContainer}>
+      <Text style={styles.quickRepliesTitle}>Quick Replies:</Text>
+      <View style={styles.quickRepliesChips}>
+        {replies.map((reply, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.quickReplyChip}
+            onPress={() => onSelect(reply)}
+            accessible={true}
+            accessibilityLabel={`Quick reply: ${reply}`}
+            accessibilityRole="button"
+          >
+            <Text style={styles.quickReplyText}>{reply}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+// ---------- MAIN COMPONENT ----------
+export default function ChatBotScreen({ navigation }: NavigationProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showHumanButton, setShowHumanButton] = useState(false);
   const [mode, setMode] = useState<ChatMode>('customer_care');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastMessageId, setLastMessageId] = useState<string | null>(null);
+  
   const flatListRef = useRef<FlatList<Message>>(null);
 
-  // Scroll to bottom
-  const scrollToBottom = () => {
+  // Load saved mode from session
+  useEffect(() => {
+    // In a real app, load from AsyncStorage
+    // const savedMode = await AsyncStorage.getItem('chatMode');
+    // if (savedMode) setMode(savedMode as ChatMode);
+  }, []);
+
+  // Save mode to session
+  useEffect(() => {
+    // In a real app, save to AsyncStorage
+    // AsyncStorage.setItem('chatMode', mode);
+  }, [mode]);
+
+  // Network listener
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? false);
+      if (!state.isConnected) {
+        setError(STRINGS.errors.offline);
+      } else {
+        setError(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
-  };
+  }, []);
 
-  const sendMessage = async (messageText?: string) => {
+  const debouncedSendMessage = useCallback(
+    debounce(async (messageText: string, messageMode: ChatMode) => {
+      if (!isOnline) {
+        setError(STRINGS.errors.offline);
+        return;
+      }
+
+      const messageId = generateId();
+      const newMsg: Message = { 
+        from: "user", 
+        text: messageText, 
+        timestamp: Date.now(),
+        id: messageId,
+      };
+      
+      setMessages((prev) => [...prev, newMsg]);
+      setLoading(true);
+      setError(null);
+      scrollToBottom();
+
+      try {
+        const reply = await getLauribotResponse(messageText, messageMode);
+        
+        const botMessage: Message = { 
+          from: "bot", 
+          text: reply, 
+          timestamp: Date.now(),
+          id: generateId(),
+        };
+        setMessages((prev) => [...prev, botMessage]);
+        setLastMessageId(botMessage.id);
+        
+        speakMessage(reply);
+        
+        if (messageMode === 'customer_care') {
+          const userRequestedHuman = messageText.toLowerCase().includes("human") || 
+                                    messageText.toLowerCase().includes("agent") ||
+                                    messageText.toLowerCase().includes("representative") ||
+                                    messageText.toLowerCase().includes("person");
+          
+          const botSuggestedHuman = reply.toLowerCase().includes("human agent") ||
+                                   reply.toLowerCase().includes("live agent") ||
+                                   reply.toLowerCase().includes("contact support") ||
+                                   reply.toLowerCase().includes("talk to a human") ||
+                                   reply.toLowerCase().includes("customer service") ||
+                                   reply.toLowerCase().includes("cannot help") ||
+                                   reply.toLowerCase().includes("unable to assist");
+          
+          setShowHumanButton(userRequestedHuman || botSuggestedHuman);
+        }
+        
+      } catch (error: any) {
+        const errorMessage: Message = { 
+          from: "bot", 
+          text: STRINGS.errors.generic,
+          timestamp: Date.now(),
+          id: generateId(),
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+        setError(STRINGS.errors.generic);
+      } finally {
+        setLoading(false);
+        scrollToBottom();
+      }
+    }, 500),
+    [isOnline, scrollToBottom]
+  );
+
+  const sendMessage = useCallback((messageText?: string) => {
     const textToSend = messageText || input.trim();
     
     if (!textToSend || loading) {
       return;
     }
 
-    const newMsg: Message = { from: "user", text: textToSend };
-    setMessages((prev: Message[]) => [...prev, newMsg]);
-    
     if (!messageText) {
       setInput("");
     }
     
-    setLoading(true);
-    scrollToBottom();
+    debouncedSendMessage(textToSend, mode);
+  }, [input, loading, mode, debouncedSendMessage]);
 
-    try {
-      const reply = await getLauribotResponse(textToSend, mode);
-      
-      const botMessage: Message = { from: "bot", text: reply };
-      setMessages((prev: Message[]) => [...prev, botMessage]);
-      
-      // Speak the bot's response
-      speakMessage(reply);
-      
-      // Enhanced human agent button logic - ONLY show when:
-      // 1. User explicitly asks for human agent, OR
-      // 2. Bot indicates it can't help and suggests human agent
-      if (mode === 'customer_care') {
-        const userRequestedHuman = textToSend.toLowerCase().includes("human") || 
-                                  textToSend.toLowerCase().includes("agent") ||
-                                  textToSend.toLowerCase().includes("representative") ||
-                                  textToSend.toLowerCase().includes("person");
-        
-        const botSuggestedHuman = reply.toLowerCase().includes("human agent") ||
-                                 reply.toLowerCase().includes("live agent") ||
-                                 reply.toLowerCase().includes("contact support") ||
-                                 reply.toLowerCase().includes("talk to a human") ||
-                                 reply.toLowerCase().includes("customer service") ||
-                                 reply.toLowerCase().includes("cannot help") ||
-                                 reply.toLowerCase().includes("unable to assist");
-        
-        setShowHumanButton(userRequestedHuman || botSuggestedHuman);
-      }
-      
-    } catch (error: any) {
-      const errorMessage: Message = { 
-        from: "bot", 
-        text: "I'm experiencing technical difficulties. Please try again later." 
-      };
-      setMessages((prev: Message[]) => [...prev, errorMessage]);
-    } finally {
-      setLoading(false);
-      scrollToBottom();
-    }
-  };
-
-  const speakMessage = (text: string) => {
+  const speakMessage = useCallback((text: string) => {
     try {
       setIsSpeaking(true);
       Speech.speak(text, {
@@ -119,20 +542,109 @@ export default function ChatBotScreen({ navigation }: any) {
     } catch (error) {
       setIsSpeaking(false);
     }
-  };
+  }, []);
 
-  const handleTalkToHuman = () => {
+  const handleTalkToHuman = useCallback(() => {
     navigation.navigate("HumanAgentScreen");
-  };
+  }, [navigation]);
 
-  const toggleSpeech = (text: string) => {
+  const toggleSpeech = useCallback((text: string) => {
     if (isSpeaking) {
       Speech.stop();
       setIsSpeaking(false);
     } else {
       speakMessage(text);
     }
-  };
+  }, [isSpeaking, speakMessage]);
+
+  const handleLongPress = useCallback((message: Message) => {
+    Alert.alert(
+      'Message Options',
+      `Sent ${new Date(message.timestamp).toLocaleTimeString()}`,
+      [
+        {
+          text: STRINGS.actions.copy,
+          onPress: () => {
+            Clipboard.setString(message.text);
+            Alert.alert(STRINGS.actions.copied);
+          },
+        },
+        {
+          text: STRINGS.actions.share,
+          onPress: async () => {
+            try {
+              await Share.share({ message: message.text });
+            } catch (error) {
+              console.error('Share error:', error);
+            }
+          },
+        },
+        {
+          text: STRINGS.actions.speak,
+          onPress: () => speakMessage(message.text),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }, [speakMessage]);
+
+  const handleRegenerate = useCallback((message: Message) => {
+    // Find the user message that prompted this bot response
+    const messageIndex = messages.findIndex(m => m.id === message.id);
+    if (messageIndex > 0) {
+      const previousMessage = messages[messageIndex - 1];
+      if (previousMessage.from === 'user') {
+        // Remove the bot message and regenerate
+        setMessages(prev => prev.filter(m => m.id !== message.id));
+        sendMessage(previousMessage.text);
+      }
+    }
+  }, [messages, sendMessage]);
+
+  const handleModeChange = useCallback((newMode: ChatMode) => {
+    setMode(newMode);
+    setShowHumanButton(false);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setError(null);
+    if (messages.length > 0) {
+      const lastUserMessage = [...messages].reverse().find(m => m.from === 'user');
+      if (lastUserMessage) {
+        sendMessage(lastUserMessage.text);
+      }
+    }
+  }, [messages, sendMessage]);
+
+  const renderItem = useCallback(({ item, index }: { item: Message; index: number }) => {
+    const showWelcome = item.from === "bot" && index === 0 && messages.length === 1;
+    
+    return (
+      <>
+        {showWelcome && (
+          <View style={styles.welcomeContainer}>
+            <Text style={styles.welcomeEmoji}>
+              {mode === 'customer_care' ? STRINGS.welcome.supportEmoji : STRINGS.welcome.exploreEmoji}
+            </Text>
+            <Text style={styles.welcomeText}>
+              {mode === 'customer_care' 
+                ? STRINGS.welcome.supportText
+                : STRINGS.welcome.exploreText}
+            </Text>
+          </View>
+        )}
+        
+        <ChatBubble
+          message={item}
+          isSpeaking={isSpeaking}
+          onToggleSpeech={toggleSpeech}
+          onLongPress={handleLongPress}
+          onRegenerate={item.from === 'bot' ? handleRegenerate : undefined}
+          mode={mode}
+        />
+      </>
+    );
+  }, [mode, isSpeaking, toggleSpeech, handleLongPress, handleRegenerate, messages.length]);
 
   return (
     <KeyboardAvoidingView
@@ -140,195 +652,106 @@ export default function ChatBotScreen({ navigation }: any) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      {/* ---------- HEADER ---------- */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.gold} />
-        </TouchableOpacity>
-        
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Lauribot</Text>
-          <Text style={styles.headerSubtitle}>
-            {mode === 'customer_care' ? '🤖 Your Support Assistant' : '🌍 Your Knowledge Partner'}
-          </Text>
+      <Header mode={mode} onBack={() => navigation.goBack()} />
+      
+      <ModeSelector mode={mode} onModeChange={handleModeChange} />
+
+      {error && (
+        <View style={styles.errorBanner}>
+          <Ionicons name="alert-circle" size={20} color={COLORS.white} />
+          <Text style={styles.errorText}>{error}</Text>
+          {!isOnline && (
+            <TouchableOpacity 
+              style={styles.retryButton} 
+              onPress={handleRetry}
+              accessible={true}
+              accessibilityLabel="Retry sending message"
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryButtonText}>{STRINGS.errors.retryButton}</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        
-        <View style={styles.headerPlaceholder} />
-      </View>
+      )}
 
-      {/* ---------- MODE SELECTOR ---------- */}
-      <View style={styles.modeSelector}>
-        <TouchableOpacity 
-          style={[
-            styles.modeButton, 
-            mode === 'customer_care' && styles.modeButtonActive
-          ]}
-          onPress={() => setMode('customer_care')}
-        >
-          <Ionicons 
-            name="headset" 
-            size={16} 
-            color={mode === 'customer_care' ? COLORS.white : COLORS.gold} 
-          />
-          <Text style={[
-            styles.modeButtonText,
-            mode === 'customer_care' && styles.modeButtonTextActive
-          ]}>Support</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.modeDivider} />
-        
-        <TouchableOpacity 
-          style={[
-            styles.modeButton, 
-            mode === 'ask_me_anything' && styles.modeButtonActive
-          ]}
-          onPress={() => setMode('ask_me_anything')}
-        >
-          <Ionicons 
-            name="bulb" 
-            size={16} 
-            color={mode === 'ask_me_anything' ? COLORS.white : COLORS.gold} 
-          />
-          <Text style={[
-            styles.modeButtonText,
-            mode === 'ask_me_anything' && styles.modeButtonTextActive
-          ]}>Explore</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ---------- CHAT MESSAGES ---------- */}
       <FlatList
         ref={flatListRef}
         data={messages}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item, index }) => {
-          const showWelcome = item.from === "bot" && index === 0 && messages.length === 1;
-          
-          return (
-            <View style={styles.messageWrapper}>
-              {showWelcome && (
-                <View style={styles.welcomeContainer}>
-                  <Text style={styles.welcomeEmoji}>
-                    {mode === 'customer_care' ? "🎯" : "✨"}
-                  </Text>
-                  <Text style={styles.welcomeText}>
-                    {mode === 'customer_care' 
-                      ? "Ready to assist with Lauritalk!" 
-                      : "Let's explore something amazing!"}
-                  </Text>
-                </View>
-              )}
-              
-              <View style={[
-                styles.messageRow,
-                item.from === "user" ? styles.userRow : styles.botRow
-              ]}>
-                {item.from === "bot" && (
-                  <View style={styles.botAvatar}>
-                    <Text style={styles.botAvatarText}>🤖</Text>
-                  </View>
-                )}
-                
-                <View
-                  style={[
-                    styles.messageBubble,
-                    item.from === "user" ? styles.userBubble : styles.botBubble,
-                  ]}
-                >
-                  <Text style={styles.messageText}>{item.text}</Text>
-                </View>
-                
-                {item.from === "bot" && (
-                  <TouchableOpacity 
-                    style={styles.speakButton}
-                    onPress={() => toggleSpeech(item.text)}
-                  >
-                    <Ionicons 
-                      name={isSpeaking ? "volume-mute" : "volume-medium"} 
-                      size={14} 
-                      color={COLORS.white} 
-                    />
-                  </TouchableOpacity>
-                )}
-                
-                {item.from === "user" && (
-                  <View style={styles.userAvatar}>
-                    <Text style={styles.userAvatarText}>👤</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          );
-        }}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
         contentContainerStyle={styles.messageContainer}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>💬</Text>
-            <Text style={styles.emptyTitle}>Start a conversation</Text>
-            <Text style={styles.emptySubtitle}>
-              Ask me about Lauritalk features or anything you'd like to explore!
-            </Text>
+            <Text style={styles.emptyEmoji}>{STRINGS.empty.emoji}</Text>
+            <Text style={styles.emptyTitle}>{STRINGS.empty.title}</Text>
+            <Text style={styles.emptySubtitle}>{STRINGS.empty.subtitle}</Text>
+            <QuickReplies mode={mode} onSelect={sendMessage} />
           </View>
         }
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={10}
       />
 
-      {/* ---------- TYPING INDICATOR ---------- */}
-      {loading && (
-        <View style={styles.typingIndicator}>
-          <View style={styles.typingBubble}>
-            <ActivityIndicator size="small" color={COLORS.gold} />
-            <Text style={styles.typingText}>Lauribot is thinking...</Text>
-          </View>
-        </View>
-      )}
+      {loading && <TypingIndicator />}
 
-      {/* ---------- HUMAN AGENT BUTTON ---------- */}
       {showHumanButton && mode === 'customer_care' && (
-        <TouchableOpacity style={styles.humanButton} onPress={handleTalkToHuman}>
+        <TouchableOpacity 
+          style={styles.humanButton} 
+          onPress={handleTalkToHuman}
+          accessible={true}
+          accessibilityLabel={STRINGS.humanAgent}
+          accessibilityRole="button"
+        >
           <Ionicons name="person" size={18} color={COLORS.white} />
-          <Text style={styles.humanButtonText}>Connect with Live Agent</Text>
+          <Text style={styles.humanButtonText}>{STRINGS.humanAgent}</Text>
         </TouchableOpacity>
       )}
 
-      {/* ---------- INPUT AREA ---------- */}
       <View style={styles.inputContainer}>
         <View style={styles.inputRow}>
           <TextInput
             style={styles.input}
             placeholder={
               mode === 'customer_care' 
-                ? "Ask about Lauritalk features..." 
-                : "What would you like to know?"
+                ? STRINGS.placeholders.support
+                : STRINGS.placeholders.explore
             }
             placeholderTextColor="#888"
             value={input}
             onChangeText={setInput}
-            editable={!loading}
+            editable={!loading && isOnline}
             onSubmitEditing={() => sendMessage()}
             returnKeyType="send"
             multiline
+            accessible={true}
+            accessibilityLabel="Message input"
+            accessibilityHint="Type your message here"
           />
           
           <TouchableOpacity 
             style={[
               styles.sendButton,
-              (!input.trim() || loading) && styles.sendButtonDisabled
+              (!input.trim() || loading || !isOnline) && styles.sendButtonDisabled
             ]} 
             onPress={() => sendMessage()} 
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || !isOnline}
+            accessible={true}
+            accessibilityLabel="Send message"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !input.trim() || loading || !isOnline }}
           >
             <Ionicons 
               name="send" 
               size={20} 
-              color={(!input.trim() || loading) ? COLORS.gray : COLORS.white} 
+              color={(!input.trim() || loading || !isOnline) ? COLORS.gray : COLORS.white} 
             />
           </TouchableOpacity>
         </View>
         
         <View style={styles.inputFooter}>
           <Text style={styles.inputFooterText}>
-            💡 {mode === 'customer_care' ? 'Tap speaker icon to hear responses' : 'Ask me anything!'}
+            💡 {mode === 'customer_care' ? STRINGS.footer.support : STRINGS.footer.explore}
           </Text>
         </View>
       </View>
@@ -357,6 +780,10 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    minWidth: ACCESSIBILITY.touchTargetSize,
+    minHeight: ACCESSIBILITY.touchTargetSize,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerCenter: {
     alignItems: 'center',
@@ -393,6 +820,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 20,
     gap: 6,
+    minHeight: ACCESSIBILITY.touchTargetSize,
   },
   modeButtonActive: {
     backgroundColor: COLORS.forestGreen,
@@ -410,6 +838,34 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: COLORS.gray,
     marginVertical: 8,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.error,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    borderRadius: 12,
+    gap: 8,
+  },
+  errorText: {
+    flex: 1,
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  retryButton: {
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    color: COLORS.error,
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   messageContainer: {
     paddingHorizontal: 16,
@@ -483,8 +939,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.forestGreen,
     borderBottomRightRadius: 6,
   },
-  botBubble: {
-    backgroundColor: COLORS.gold,
+  botBubbleGradient: {
     borderBottomLeftRadius: 6,
   },
   messageText: {
@@ -492,12 +947,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
   },
-  speakButton: {
+  messageActions: {
+    flexDirection: 'column',
+    gap: 4,
+    marginLeft: 8,
+    alignSelf: 'center',
+  },
+  actionButton: {
     padding: 6,
     backgroundColor: COLORS.darkGray,
     borderRadius: 12,
-    marginLeft: 8,
-    alignSelf: 'center',
+    minWidth: ACCESSIBILITY.touchTargetSize / 2,
+    minHeight: ACCESSIBILITY.touchTargetSize / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyState: {
     flex: 1,
@@ -521,6 +984,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.7,
     paddingHorizontal: 40,
+    marginBottom: 20,
+  },
+  quickRepliesContainer: {
+    marginTop: 20,
+    width: '100%',
+    paddingHorizontal: 20,
+  },
+  quickRepliesTitle: {
+    color: COLORS.gold,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  quickRepliesChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickReplyChip: {
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+    minHeight: ACCESSIBILITY.touchTargetSize,
+    justifyContent: 'center',
+  },
+  quickReplyText: {
+    color: COLORS.lightGold,
+    fontSize: 13,
+    fontWeight: '500',
   },
   typingIndicator: {
     paddingHorizontal: 16,
@@ -529,7 +1024,6 @@ const styles = StyleSheet.create({
   typingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.gold,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
@@ -537,9 +1031,19 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     maxWidth: '75%',
   },
+  typingDots: {
+    flexDirection: 'row',
+    gap: 4,
+    marginRight: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.white,
+  },
   typingText: {
     color: COLORS.white,
-    marginLeft: 8,
     fontStyle: 'italic',
     fontSize: 14,
   },
@@ -559,6 +1063,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+    minHeight: ACCESSIBILITY.touchTargetSize,
   },
   humanButtonText: {
     color: COLORS.white,

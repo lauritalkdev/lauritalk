@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { COLORS, THEME } from "../constants/theme";
+import { COLORS } from "../constants/theme";
 import { supabase } from "../supabase";
 
 interface TranslationHistoryItem {
@@ -22,12 +22,12 @@ interface TranslationHistoryItem {
   translation_type: string;
 }
 
-// 🟢 ADDED: Reward milestones configuration
+// 🟢 UPDATED: New reward milestones with updated rates
 const REWARD_MILESTONES = [
-  { words: 100000, reward: 10, title: "First Milestone" },
-  { words: 200000, reward: 25, title: "Word Master" },
-  { words: 800000, reward: 100, title: "Translation Expert" },
-  { words: 1600000, reward: 200, title: "Language Legend" },
+  { words: 300000, reward: 10, title: "First Milestone" },
+  { words: 650000, reward: 25, title: "Word Master" },
+  { words: 2500000, reward: 100, title: "Translation Expert" },
+  { words: 6000000, reward: 200, title: "Language Legend" },
 ];
 
 // 🟢 IMPROVED: Advanced word counting with proper validation
@@ -441,7 +441,7 @@ export default function TranslationHistoryScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.background,
+    backgroundColor: "#1A1A1A", // 🟢 CHANGED: From white to grey (#1A1A1A)
     paddingTop: 50,
   },
   header: {
@@ -471,6 +471,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#1A1A1A", // 🟢 CHANGED: Grey background
   },
   loadingText: {
     color: COLORS.gold,
@@ -682,7 +683,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sourceText: {
-    color: THEME.text,
+    color: "#E0E0E0", // 🟢 CHANGED: Lighter text for better contrast on grey
     fontSize: 14,
     marginBottom: 4,
     fontWeight: "500",
@@ -716,6 +717,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 40,
     paddingVertical: 60,
+    backgroundColor: "#1A1A1A", // 🟢 CHANGED: Grey background
   },
   emptyTitle: {
     fontSize: 20,
@@ -726,7 +728,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: THEME.text,
+    color: "#E0E0E0", // 🟢 CHANGED: Lighter text for better contrast
     textAlign: "center",
     lineHeight: 22,
   },
