@@ -1,4 +1,4 @@
-/* services/chatService.ts (UPDATED - FIXED SUBSCRIPTION HANDLING & TYPESCRIPT ERRORS) */
+/* services/chatService.ts (UPDATED - USING EDGE FUNCTION FOR TRANSLATION) */
 import {
   ApiResponse,
   CHAT_CONSTANTS,
@@ -13,10 +13,9 @@ import {
 } from '../src/types/chat';
 import { supabase } from '../supabase';
 
-// ==================== OPENAI CONFIGURATION ====================
-// ⚠️ IMPORTANT: Add your OpenAI API key here
-const OPENAI_API_KEY = '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';
-// ==================== END OPENAI CONFIGURATION ====================
+// ==================== REMOVED OPENAI API KEY ====================
+// OpenAI API key is now stored securely in Supabase Edge Function
+// ==================== END CONFIGURATION ====================
 
 interface TranslationRequest {
   message_id: string;
@@ -43,152 +42,97 @@ class ChatService {
 
   constructor() {
     this.initializeTranslationService();
-    this.testOpenAIKey(); // Test the API key on startup
+    this.testEdgeFunction(); // Test Edge Function on startup
   }
 
   private initializeTranslationService(): void {
     try {
-      // Check if OpenAI is properly configured
-      this.isTranslationServiceAvailable = this.isOpenAIConfigured();
-      
-      if (this.isTranslationServiceAvailable) {
-        console.log('✅ OpenAI translation service initialized successfully');
-      } else {
-        console.warn('⚠️ OpenAI translation service not available');
-      }
+      // Edge Function is always available if Supabase is configured
+      this.isTranslationServiceAvailable = true;
+      console.log('✅ Translation service (Edge Function) initialized successfully');
     } catch (error) {
       console.error('❌ Error initializing translation service:', error);
       this.isTranslationServiceAvailable = false;
     }
   }
 
-  // ==================== OPENAI TRANSLATION FUNCTIONS ====================
-  
-  private isOpenAIConfigured(): boolean {
-    return !!OPENAI_API_KEY && 
-           OPENAI_API_KEY !== null && 
-           OPENAI_API_KEY.trim().length > 0;
-  }
+  // ==================== EDGE FUNCTION TRANSLATION ====================
 
   /**
-   * Test the OpenAI API key
+   * Test the Edge Function
    */
-  async testOpenAIKey(): Promise<void> {
+  async testEdgeFunction(): Promise<void> {
     try {
-      console.log('🔍 Testing OpenAI API key...');
+      console.log('🔍 Testing Edge Function...');
       
-      if (!this.isOpenAIConfigured()) {
-        console.error('❌ OpenAI key not configured');
-        this.isTranslationServiceAvailable = false;
-        return;
-      }
-      
-      // Simple test call
-      const response = await fetch('https://api.openai.com/v1/models', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
+      // Simple test translation
+      const response = await supabase.functions.invoke('translate-chat', {
+        body: {
+          action: 'translate',
+          text: 'Hello',
+          sourceLanguage: 'en',
+          targetLanguage: 'es'
+        }
       });
       
-      if (response.ok) {
-        console.log('✅ OpenAI API key is valid!');
-        this.isTranslationServiceAvailable = true;
-      } else {
-        console.error(`❌ OpenAI API key test failed: ${response.status}`);
+      if (response.error) {
+        console.error('❌ Edge Function test failed:', response.error);
         this.isTranslationServiceAvailable = false;
+      } else {
+        console.log('✅ Edge Function is working!');
+        this.isTranslationServiceAvailable = true;
       }
     } catch (error) {
-      console.error('❌ Error testing OpenAI key:', error);
+      console.error('❌ Error testing Edge Function:', error);
       this.isTranslationServiceAvailable = false;
     }
   }
 
   /**
-   * Helper function to create abort controller for timeout
+   * Translate text using Edge Function
    */
-  private createAbortController(timeoutMs: number): AbortController {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), timeoutMs);
-    return controller;
-  }
-
-  /**
-   * Translate text using OpenAI API
-   */
-  private async translateWithOpenAI(
+  private async translateWithEdgeFunction(
     text: string, 
     sourceLanguage: string, 
     targetLanguage: string
   ): Promise<string> {
-    const abortController = this.createAbortController(10000); // 10 second timeout
-    
     try {
-      console.log(`🌍 [OPENAI] Translating: ${sourceLanguage} → ${targetLanguage}`);
+      console.log(`🌍 [EDGE] Translating: ${sourceLanguage} → ${targetLanguage}`);
       
-      // Map language codes to proper names for OpenAI prompt
-      const sourceLangName = this.getLanguageName(sourceLanguage);
-      const targetLangName = this.getLanguageName(targetLanguage);
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a professional translator. Translate the following text from ${sourceLangName} to ${targetLangName}. Only return the translated text, no explanations, no additional text. If the text contains emojis or special characters, preserve them.`
-            },
-            {
-              role: 'user',
-              content: text
-            }
-          ],
-          max_tokens: 1000,
-          temperature: 0.1, // Low temperature for consistent translations
-          top_p: 1,
-          frequency_penalty: 0,
-          presence_penalty: 0
-        }),
-        signal: abortController.signal,
+      const response = await supabase.functions.invoke('translate-chat', {
+        body: {
+          action: 'translate',
+          text,
+          sourceLanguage,
+          targetLanguage
+        }
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ [OPENAI] API error: ${response.status}`, errorText);
-        throw new Error(`OpenAI API error: ${response.status}`);
+      if (response.error) {
+        console.error(`❌ [EDGE] API error:`, response.error);
+        throw new Error(`Edge Function error: ${response.error.message}`);
       }
 
-      const data = await response.json();
+      const data = response.data;
       
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        const translatedText = data.choices[0].message.content.trim();
-        console.log(`✅ [OPENAI] Translation successful: ${text.substring(0, 50)}... → ${translatedText.substring(0, 50)}...`);
-        return translatedText;
+      if (data && data.translatedText) {
+        console.log(`✅ [EDGE] Translation successful: ${text.substring(0, 50)}... → ${data.translatedText.substring(0, 50)}...`);
+        return data.translatedText;
       } else {
-        console.error('❌ [OPENAI] No translation received:', data);
-        throw new Error('No translation received from OpenAI');
+        console.error('❌ [EDGE] No translation received:', data);
+        throw new Error('No translation received from Edge Function');
       }
 
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.error('❌ [OPENAI] Translation timeout');
-        throw new Error('Translation timeout - request took too long');
-      }
-      console.error('❌ [OPENAI] Translation error:', error);
+      console.error('❌ [EDGE] Translation error:', error);
       throw error;
     }
   }
 
   /**
-   * Batch translate texts using OpenAI (with fallback to individual calls)
+   * Batch translate texts using Edge Function
    */
-  private async translateBatchWithOpenAI(
+  private async translateBatchWithEdgeFunction(
     texts: string[], 
     sourceLanguage: string, 
     targetLanguage: string
@@ -196,107 +140,52 @@ class ChatService {
     // For single text, use regular translation
     if (texts.length === 1) {
       try {
-        const result = await this.translateWithOpenAI(texts[0], sourceLanguage, targetLanguage);
+        const result = await this.translateWithEdgeFunction(texts[0], sourceLanguage, targetLanguage);
         return [result];
       } catch (error) {
-        console.error('❌ [OPENAI] Single translation failed:', error);
+        console.error('❌ [EDGE] Single translation failed:', error);
         return [texts[0]]; // Return original text on error
       }
     }
 
-    const abortController = this.createAbortController(15000); // 15 second timeout for batch
-    
     try {
-      console.log(`🌍 [OPENAI] Batch translating ${texts.length} messages`);
+      console.log(`🌍 [EDGE] Batch translating ${texts.length} messages`);
       
-      const sourceLangName = this.getLanguageName(sourceLanguage);
-      const targetLangName = this.getLanguageName(targetLanguage);
-      
-      // Combine texts with separators
-      const combinedTexts = texts.map((text, index) => `[${index + 1}] ${text}`).join('\n\n');
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a professional translator. Translate the following messages from ${sourceLangName} to ${targetLangName}. 
-              Each message is numbered like [1], [2], etc. 
-              Return ONLY the translations in the same order and format: [1] translation1\n\n[2] translation2\n\n[3] translation3
-              Do not add any explanations or additional text. Preserve emojis and special characters.`
-            },
-            {
-              role: 'user',
-              content: combinedTexts
-            }
-          ],
-          max_tokens: 2000,
-          temperature: 0.1,
-          top_p: 1,
-          frequency_penalty: 0,
-          presence_penalty: 0
-        }),
-        signal: abortController.signal,
+      const response = await supabase.functions.invoke('translate-chat', {
+        body: {
+          action: 'translateBatch',
+          texts,
+          sourceLanguage,
+          targetLanguage
+        }
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ [OPENAI] Batch API error: ${response.status}`, errorText);
-        throw new Error(`OpenAI batch API error: ${response.status}`);
+      if (response.error) {
+        console.error(`❌ [EDGE] Batch API error:`, response.error);
+        throw new Error(`Edge Function batch error: ${response.error.message}`);
       }
 
-      const data = await response.json();
+      const data = response.data;
       
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        const translatedText = data.choices[0].message.content.trim();
-        
-        // Parse the response to extract individual translations
-        const translations: string[] = [];
-        const lines = translatedText.split('\n\n');
-        
-        for (let i = 0; i < texts.length; i++) {
-          const expectedPrefix = `[${i + 1}] `;
-          let foundTranslation = texts[i]; // Default to original text
-          
-          for (const line of lines) {
-            if (line.startsWith(expectedPrefix)) {
-              foundTranslation = line.substring(expectedPrefix.length).trim();
-              break;
-            }
-          }
-          
-          translations.push(foundTranslation);
-        }
-        
-        console.log(`✅ [OPENAI] Batch translation successful for ${translations.length} messages`);
-        return translations;
+      if (data && data.translations && Array.isArray(data.translations)) {
+        console.log(`✅ [EDGE] Batch translation successful for ${data.translations.length} messages`);
+        return data.translations;
       } else {
-        throw new Error('No batch translation received from OpenAI');
+        throw new Error('No batch translation received from Edge Function');
       }
 
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.error('❌ [OPENAI] Batch translation timeout');
-        throw new Error('Batch translation timeout - request took too long');
-      }
-      
-      console.error('❌ [OPENAI] Batch translation failed:', error);
+      console.error('❌ [EDGE] Batch translation failed:', error);
       // Fallback to individual translations
-      console.log('⚠️ [OPENAI] Falling back to individual translations');
+      console.log('⚠️ [EDGE] Falling back to individual translations');
       
       const translations: string[] = [];
       for (let i = 0; i < texts.length; i++) {
         try {
-          const translated = await this.translateWithOpenAI(texts[i], sourceLanguage, targetLanguage);
+          const translated = await this.translateWithEdgeFunction(texts[i], sourceLanguage, targetLanguage);
           translations.push(translated);
         } catch (individualError) {
-          console.error(`❌ [OPENAI] Failed to translate message ${i + 1}:`, individualError);
+          console.error(`❌ [EDGE] Failed to translate message ${i + 1}:`, individualError);
           translations.push(texts[i]); // Return original on error
         }
       }
@@ -1339,7 +1228,7 @@ class ChatService {
     }
   }
 
-  // ==================== FRONTEND AUTO TRANSLATE ALL MESSAGES (USING OPENAI) ====================
+  // ==================== FRONTEND AUTO TRANSLATE ALL MESSAGES (USING EDGE FUNCTION) ====================
   async autoTranslateIncomingMessage(
     message: ChatMessage,
     targetLanguage: string
@@ -1386,10 +1275,10 @@ class ChatService {
         };
       }
 
-      // Call OpenAI for translation
-      console.log(`📤 [FRONTEND] Translating incoming message via OpenAI: ${originalLang} → ${targetLanguage}`);
+      // Call Edge Function for translation
+      console.log(`📤 [FRONTEND] Translating incoming message via Edge Function: ${originalLang} → ${targetLanguage}`);
       
-      const translatedText = await this.translateWithOpenAI(
+      const translatedText = await this.translateWithEdgeFunction(
         message.original_text,
         originalLang,
         targetLanguage
@@ -1413,7 +1302,7 @@ class ChatService {
     }
   }
 
-  // ==================== TRANSLATE ALL MESSAGES FOR PREMIUM USERS (USING OPENAI) ====================
+  // ==================== TRANSLATE ALL MESSAGES FOR PREMIUM USERS (USING EDGE FUNCTION) ====================
   async translateMessagesForUser(
     messages: ChatMessage[],
     targetLanguage: string,
@@ -1482,10 +1371,10 @@ class ChatService {
           
           if (texts.length > 1) {
             // Batch translate for this language group
-            batchTranslations = await this.translateBatchWithOpenAI(texts, sourceLang, targetLanguage);
+            batchTranslations = await this.translateBatchWithEdgeFunction(texts, sourceLang, targetLanguage);
           } else {
             // Single translation
-            batchTranslations = [await this.translateWithOpenAI(texts[0], sourceLang, targetLanguage)];
+            batchTranslations = [await this.translateWithEdgeFunction(texts[0], sourceLang, targetLanguage)];
           }
           
           // Assign translations back to their positions
@@ -1495,7 +1384,7 @@ class ChatService {
           }
           
         } catch (batchError) {
-          console.error(`❌ [OPENAI] Failed to translate ${sourceLang} group:`, batchError);
+          console.error(`❌ [EDGE] Failed to translate ${sourceLang} group:`, batchError);
           
           // Fallback: try individual translations for this group
           for (let i = 0; i < messageIndices.length; i++) {
@@ -1503,14 +1392,14 @@ class ChatService {
             const msg = messagesToTranslate[originalIndex];
             
             try {
-              const translated = await this.translateWithOpenAI(
+              const translated = await this.translateWithEdgeFunction(
                 msg.original_text,
                 sourceLang,
                 targetLanguage
               );
               translatedTexts[originalIndex] = translated;
             } catch (error) {
-              console.error(`❌ [OPENAI] Failed to translate message ${msg.id}:`, error);
+              console.error(`❌ [EDGE] Failed to translate message ${msg.id}:`, error);
               translatedTexts[originalIndex] = msg.original_text; // Keep original text on error
             }
           }

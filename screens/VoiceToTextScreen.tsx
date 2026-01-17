@@ -18,19 +18,20 @@ import {
   View
 } from 'react-native';
 
-// OpenAI API Key - REPLACE WITH YOUR ACTUAL KEY
-const OPENAI_API_KEY = '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';
+// ==================== REMOVED OPENAI API KEY ====================
+// OpenAI API key is now stored securely in Supabase Edge Function
+// ==================== END CONFIGURATION ====================
 
-// 🟢 ADDED: Supabase import
+// 🟢 Supabase import
 import { supabase } from '../supabase';
-// 🟢 CHANGED: Use new word limit hook
+// 🟢 Use new word limit hook
 import { useWordLimits } from '../hooks/useWordLimits';
-// 🟢 ADDED: Limit exceeded modal import
+// 🟢 Limit exceeded modal import
 import LimitExceededModal from '../components/LimitExceededModal';
-// 🟢 ADDED: Import translateText utility for Azure translations
+// 🟢 Import translateText utility for Azure translations
 import { translateText } from '../utils/translateText';
 
-// 🟢 ADDED: Import DICTIONARIES for Cameroonian dialects
+// 🟢 Import DICTIONARIES for Cameroonian dialects
 import enBafut from '../assets/dictionaries/EnglishtoBafut.json';
 import enBakossi from '../assets/dictionaries/EnglishtoBakossi.json';
 import enBakwere from '../assets/dictionaries/EnglishtoBakwere.json';
@@ -43,7 +44,7 @@ import enMungaka from '../assets/dictionaries/EnglishtoMungaka.json';
 import enNgemba from '../assets/dictionaries/EnglishtoNgemba.json';
 import enOroko from '../assets/dictionaries/EnglishtoOroko.json';
 
-// 🟢 ADDED: MAP DICTIONARIES
+// 🟢 MAP DICTIONARIES
 const dictionaries: { [key: string]: any } = {
   'bkw': enBakwere,
   'bam': enBamileke,
@@ -58,20 +59,20 @@ const dictionaries: { [key: string]: any } = {
   'oro': enOroko,
 };
 
-// 🟢 ADDED: Cameroonian dialects configuration
+// 🟢 Cameroonian dialects configuration
 const cameroonianDialects = ['bga', 'bkw', 'bak', 'byi', 'kom', 'nge', 'mgk', 'bam', 'dua', 'baf', 'oro'];
 
-// 🟢 ADDED: Function to check if language is a Cameroonian dialect
+// 🟢 Function to check if language is a Cameroonian dialect
 const isCameroonianDialect = (langCode: string): boolean => {
   return cameroonianDialects.includes(langCode);
 };
 
-// 🟢 ADDED: Function to normalize text for dictionary lookup
+// 🟢 Function to normalize text for dictionary lookup
 const normalizeText = (text: string): string => {
   return text.toLowerCase().trim().replace(/[.,?!]/g, '');
 };
 
-// 🟢 ADDED: Function to translate English to Dialect using dictionary
+// 🟢 Function to translate English to Dialect using dictionary
 const translateEnglishToDialect = (text: string, targetDialect: string): string => {
   const dictionary = dictionaries[targetDialect];
   if (!dictionary?.translations) {
@@ -125,7 +126,7 @@ const translateEnglishToDialect = (text: string, targetDialect: string): string 
   return `[No ${dictionary.targetLanguage} translation for "${text}"]`;
 };
 
-// 🟢 ADDED: Function to translate Dialect to English using dictionary
+// 🟢 Function to translate Dialect to English using dictionary
 const translateDialectToEnglish = (text: string, sourceDialect: string): string => {
   const dictionary = dictionaries[sourceDialect];
   if (!dictionary?.translations) {
@@ -174,7 +175,7 @@ const translateDialectToEnglish = (text: string, sourceDialect: string): string 
   return `[No English translation for "${text}" in ${dictionary.targetLanguage}]`;
 };
 
-// 🟢 ADDED: Function to translate Dialect to Dialect (via English bridge)
+// 🟢 Function to translate Dialect to Dialect (via English bridge)
 const translateDialectToDialect = (text: string, sourceDialect: string, targetDialect: string): string => {
   console.log(`🎯 Translating ${sourceDialect} → ${targetDialect} via English bridge`);
   
@@ -207,7 +208,7 @@ const translateDialectToDialect = (text: string, sourceDialect: string, targetDi
   return finalResult;
 };
 
-// 🟢 ADDED: Function to translate International Language to Dialect (via Azure)
+// 🟢 Function to translate International Language to Dialect (via Azure)
 const translateInternationalToDialect = async (
   text: string, 
   sourceInternational: string, 
@@ -230,7 +231,7 @@ const translateInternationalToDialect = async (
   return finalResult;
 };
 
-// 🟢 ADDED: Function to translate Dialect to International Language (via Azure)
+// 🟢 Function to translate Dialect to International Language (via Azure)
 const translateDialectToInternational = async (
   text: string, 
   sourceDialect: string, 
@@ -258,7 +259,7 @@ const translateDialectToInternational = async (
   }
 };
 
-// 🟢 ADDED: Word counting function (same as in TranslationHistory)
+// 🟢 Word counting function (same as in TranslationHistory)
 const countValidWords = (text: string): number => {
   if (!text || text.trim().length === 0) return 0;
   
@@ -296,7 +297,7 @@ const countValidWords = (text: string): number => {
   return validWords.length;
 };
 
-// 🟢 ADDED: Function to save voice translation to history
+// 🟢 Function to save voice translation to history
 const saveVoiceTranslationToHistory = async (
   sourceText: string, 
   translatedText: string, 
@@ -322,7 +323,7 @@ const saveVoiceTranslationToHistory = async (
         translated_text: translatedText,
         source_language: sourceLanguage,
         target_language: targetLanguage,
-        translation_type: 'voice', // 🟢 Differentiate from text translations
+        translation_type: 'voice',
         created_at: new Date().toISOString(),
       });
 
@@ -347,13 +348,13 @@ const VoiceToTextScreen = ({ navigation }: any) => {
   const [showFromLanguageSelector, setShowFromLanguageSelector] = useState(false);
   const [showToLanguageSelector, setShowToLanguageSelector] = useState(false);
   const [pulseAnim] = useState(new Animated.Value(1));
-  const [searchFromQuery, setSearchFromQuery] = useState(''); // 🟢 ADDED: Search state for From
-  const [searchToQuery, setSearchToQuery] = useState(''); // 🟢 ADDED: Search state for To
+  const [searchFromQuery, setSearchFromQuery] = useState('');
+  const [searchToQuery, setSearchToQuery] = useState('');
 
-  // 🟢 ADDED: Word count state for current translation
+  // 🟢 Word count state for current translation
   const [currentWordCount, setCurrentWordCount] = useState(0);
 
-  // 🟢 CHANGED: Use new word limit hook
+  // 🟢 Use new word limit hook
   const { 
     checkAndUpdateWordCount,
     modalVisible,
@@ -367,7 +368,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
     calculateWordCount
   } = useWordLimits();
 
-  // 🟢 UPDATED: 150+ languages categorized by continents (INCLUDING CAMEROONIAN DIALECTS)
+  // 🟢 150+ languages categorized by continents (INCLUDING CAMEROONIAN DIALECTS)
   const languageCategories = [
     {
       name: 'Europe',
@@ -572,7 +573,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
   // Flatten all languages for easy access
   const allLanguages = languageCategories.flatMap(category => category.languages);
 
-  // 🟢 ADDED: Function to get filtered languages based on search query
+  // 🟢 Function to get filtered languages based on search query
   const getFilteredLanguages = (query: string, type: 'from' | 'to') => {
     if (!query.trim()) {
       return languageCategories;
@@ -594,7 +595,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
   const currentFromSearchResults = getFilteredLanguages(searchFromQuery, 'from');
   const currentToSearchResults = getFilteredLanguages(searchToQuery, 'to');
 
-  // 🟢 ADDED: Language switcher function
+  // 🟢 Language switcher function
   const switchLanguages = () => {
     const temp = fromLanguage;
     setFromLanguage(targetLanguage);
@@ -606,7 +607,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
     setDebugInfo(`🔄 Switched: ${fromLang?.emoji} ${fromLang?.name} ↔ ${toLang?.emoji} ${toLang?.name}`);
   };
 
-  // 🟢 ADDED: Handle upgrade button press
+  // 🟢 Handle upgrade button press
   const handleUpgrade = async () => {
     closeModal();
     Alert.alert(
@@ -657,7 +658,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
     );
   };
 
-  // 🟢 UPDATED: TRANSLATION FUNCTION with DIALECT SUPPORT
+  // 🟢 TRANSLATION FUNCTION with DIALECT SUPPORT
   const translateTextWithDialectSupport = async (
     text: string, 
     fromLang: string, 
@@ -698,54 +699,37 @@ const VoiceToTextScreen = ({ navigation }: any) => {
       return await translateDialectToInternational(text, fromLang, toLang);
     }
     
-    // 🟢 CASE 6: International to International (use Azure or OpenAI)
+    // 🟢 CASE 6: International to International (use Azure or Edge Function)
     console.log('🌐 Using Azure for International → International');
     try {
       return await translateText(text, fromLang, toLang);
     } catch (err) {
-      console.error("Azure translation failed, using OpenAI fallback:", err);
-      return await translateWithOpenAI(text, fromLang, toLang);
+      console.error("Azure translation failed, using Edge Function fallback:", err);
+      return await translateWithEdgeFunction(text, fromLang, toLang);
     }
   };
 
-  // REAL TRANSLATION FUNCTION using OpenAI (fallback for International languages)
-  const translateWithOpenAI = async (text: string, fromLang: string, toLang: string): Promise<string> => {
+  // ==================== UPDATED: Use Edge Function for translation ====================
+  const translateWithEdgeFunction = async (text: string, fromLang: string, toLang: string): Promise<string> => {
     try {
       setDebugInfo(`🌍 Translating from ${getLanguageName(fromLang)} to ${getLanguageName(toLang)}...`);
       
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a professional translator. Translate the following text from ${getLanguageName(fromLang)} to ${getLanguageName(toLang)}. Only return the translated text, no explanations.`
-            },
-            {
-              role: 'user',
-              content: text
-            }
-          ],
-          max_tokens: 1000,
-          temperature: 0.3
-        }),
+      const { data, error } = await supabase.functions.invoke('voice-to-text', {
+        body: {
+          action: 'translate',
+          text,
+          fromLanguage: fromLang,
+          toLanguage: toLang
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`Translation error: ${response.status}`);
+      if (error) {
+        throw new Error(`Translation error: ${error.message}`);
       }
 
-      const data = await response.json();
-      
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        const translatedText = data.choices[0].message.content.trim();
+      if (data && data.translatedText) {
         setDebugInfo('✅ Translation successful!');
-        return translatedText;
+        return data.translatedText;
       } else {
         throw new Error('No translation received');
       }
@@ -926,7 +910,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
     }
   };
 
-  // 🟢 ADDED: Language selector modal with search
+  // 🟢 Language selector modal with search
   const LanguageSelectorModal = ({ type }: { type: 'from' | 'to' }) => {
     const filteredCategories = type === 'from' ? currentFromSearchResults : currentToSearchResults;
     const searchQuery = type === 'from' ? searchFromQuery : searchToQuery;
@@ -940,7 +924,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
             Select {type === 'from' ? 'Input' : 'Output'} Language
           </Text>
           
-          {/* 🟢 ADDED: Search Bar */}
+          {/* 🟢 Search Bar */}
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#D4AF37" style={styles.searchIcon} />
             <TextInput
@@ -962,7 +946,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
             )}
           </View>
           
-          {/* 🟢 ADDED: Search results info - FIXED: Wrapped the "s" in <Text> */}
+          {/* 🟢 Search results info */}
           {searchQuery.trim() && (
             <Text style={styles.searchResultsText}>
               Found {totalLanguages} language{totalLanguages !== 1 ? <Text>s</Text> : ''} for "{searchQuery}"
@@ -1021,10 +1005,10 @@ const VoiceToTextScreen = ({ navigation }: any) => {
             onPress={() => {
               if (type === 'from') {
                 setShowFromLanguageSelector(false);
-                setSearchFromQuery(""); // Reset search
+                setSearchFromQuery("");
               } else {
                 setShowToLanguageSelector(false);
-                setSearchToQuery(""); // Reset search
+                setSearchToQuery("");
               }
             }}
           >
@@ -1038,7 +1022,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
   const selectFromLanguage = (langCode: string) => {
     setFromLanguage(langCode);
     setShowFromLanguageSelector(false);
-    setSearchFromQuery(""); // Reset search
+    setSearchFromQuery("");
     const lang = allLanguages.find(l => l.code === langCode);
     setDebugInfo(`🎤 Input language: ${lang?.emoji} ${lang?.name}`);
   };
@@ -1046,7 +1030,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
   const selectToLanguage = (langCode: string) => {
     setTargetLanguage(langCode);
     setShowToLanguageSelector(false);
-    setSearchToQuery(""); // Reset search
+    setSearchToQuery("");
     const lang = allLanguages.find(l => l.code === langCode);
     setDebugInfo(`🌍 Output language: ${lang?.emoji} ${lang?.name}`);
   };
@@ -1116,38 +1100,38 @@ const VoiceToTextScreen = ({ navigation }: any) => {
         
         try {
           let transcribedText;
-          let usedOpenAI = false;
+          let usedEdgeFunction = false;
 
-          // Try OpenAI for transcription
+          // Try Edge Function for transcription
           try {
-            transcribedText = await transcribeWithOpenAI(uri);
-            usedOpenAI = true;
-          } catch (openaiError) {
+            transcribedText = await transcribeWithEdgeFunction(uri);
+            usedEdgeFunction = true;
+          } catch (edgeFunctionError) {
             console.log('Audio processing failed, using fallback');
             transcribedText = await transcribeWithFallback(uri);
-            usedOpenAI = false;
+            usedEdgeFunction = false;
           }
           
-          // 🟢 CHANGED: Check word limit using new system
+          // 🟢 Check word limit using new system
           const { allowed } = await checkAndUpdateWordCount(transcribedText);
           if (!allowed) {
             console.log('Voice translation blocked due to word limit');
             setIsProcessing(false);
-            return; // Stop translation if limit exceeded
+            return;
           }
           
-          // 🟢 UPDATED: Use new translation function with dialect support
+          // 🟢 Use new translation function with dialect support
           const translatedText = await translateTextWithDialectSupport(
             transcribedText, 
             fromLanguage, 
             targetLanguage
           );
           
-          // 🟢 ADDED: Calculate word count
+          // 🟢 Calculate word count
           const wordCount = countValidWords(transcribedText);
           setCurrentWordCount(wordCount);
           
-          // 🟢 ADDED: Save to translation history
+          // 🟢 Save to translation history
           await saveVoiceTranslationToHistory(
             transcribedText, 
             translatedText, 
@@ -1163,9 +1147,8 @@ const VoiceToTextScreen = ({ navigation }: any) => {
             translatedText: translatedText,
             fromLanguage: fromLanguage,
             targetLanguage: targetLanguage,
-            status: usedOpenAI ? '✨ AI Translation' : '✨ Fallback Translation',
+            status: usedEdgeFunction ? '✨ AI Translation' : '✨ Fallback Translation',
             wordCount: wordCount,
-            // 🟢 ADDED: Translation type indicator
             translationType: isCameroonianDialect(fromLanguage) || isCameroonianDialect(targetLanguage) 
               ? '📚 Dictionary' 
               : '🌐 AI'
@@ -1173,7 +1156,6 @@ const VoiceToTextScreen = ({ navigation }: any) => {
 
           setRecordings(prev => [recordingInfo, ...prev]);
           
-          // 🟢 UPDATED: Debug info based on translation type
           if (isCameroonianDialect(fromLanguage) || isCameroonianDialect(targetLanguage)) {
             setDebugInfo(`📚 Dictionary translation complete! (${wordCount} words)`);
           } else {
@@ -1191,7 +1173,6 @@ const VoiceToTextScreen = ({ navigation }: any) => {
                 text: 'OK',
                 style: 'default'
               }
-              // 🟢 REMOVED: Speak Translation button
             ]
           );
 
@@ -1211,8 +1192,6 @@ const VoiceToTextScreen = ({ navigation }: any) => {
       setIsProcessing(false);
     }
   };
-
-  // 🟢 REMOVED: All text-to-speech functions and related code
 
   const playRecording = async (uri: string) => {
     try {
@@ -1241,44 +1220,62 @@ const VoiceToTextScreen = ({ navigation }: any) => {
     Alert.alert('Cleared', 'All translation history removed');
   };
 
-  // OpenAI Transcription Function
-  const transcribeWithOpenAI = async (audioUri: string): Promise<string> => {
+  // ==================== UPDATED: Edge Function Transcription with BASE64 ====================
+  const transcribeWithEdgeFunction = async (audioUri: string): Promise<string> => {
     try {
-      setDebugInfo('🔊 Processing audio...');
+      setDebugInfo('🔊 Processing audio via Edge Function...');
+      console.log('🔍 [TRANSCRIBE] Audio URI:', audioUri);
       
-      const formData = new FormData();
-      formData.append('file', {
-        uri: audioUri,
-        type: 'audio/m4a',
-        name: 'recording.m4a',
-      } as any);
-      formData.append('model', 'whisper-1');
-      formData.append('response_format', 'json');
-      formData.append('language', fromLanguage);
+      // Read the audio file
+      console.log('📤 [TRANSCRIBE] Fetching audio file...');
+      const response = await fetch(audioUri);
+      console.log('✅ [TRANSCRIBE] Fetched audio file, status:', response.status);
+      
+      const blob = await response.blob();
+      console.log('✅ [TRANSCRIBE] Got blob, size:', blob.size, 'bytes, type:', blob.type);
 
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'multipart/form-data',
-        },
-        body: formData,
+      // Convert to base64
+      const reader = new FileReader();
+      const base64Audio = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          // Remove data URL prefix (e.g., "data:audio/m4a;base64,")
+          const base64Data = base64.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      
+      console.log('📤 [TRANSCRIBE] Calling Edge Function with base64, length:', base64Audio.length);
+
+      // Call Edge Function with JSON containing base64
+      const { data, error } = await supabase.functions.invoke('voice-to-text', {
+        body: {
+          action: 'transcribe',
+          audioBase64: base64Audio,
+          language: fromLanguage
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`Audio processing error: ${response.status}`);
+      console.log('📡 [TRANSCRIBE] Edge Function response:', { data, error });
+
+      if (error) {
+        console.error('❌ [TRANSCRIBE] Edge Function error:', error);
+        throw new Error(`Transcription error: ${error.message || JSON.stringify(error)}`);
       }
 
-      const data = await response.json();
-      
-      if (data.text) {
+      if (data && data.text) {
+        console.log('✅ [TRANSCRIBE] Transcription successful:', data.text);
         setDebugInfo('✅ Transcription successful!');
         return data.text;
       } else {
+        console.error('❌ [TRANSCRIBE] No text in response:', data);
         throw new Error('No transcription received');
       }
 
     } catch (error: any) {
+      console.error('❌ [TRANSCRIBE] Full transcription error:', error);
       setDebugInfo('❌ Audio processing failed');
       throw new Error(`Audio processing: ${error.message}`);
     }
@@ -1322,7 +1319,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
-          {/* 🟢 UPDATED: Limit Exceeded Modal with proper props */}
+          {/* 🟢 Limit Exceeded Modal */}
           <LimitExceededModal
             visible={modalVisible}
             type={modalType}
@@ -1333,7 +1330,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
             onUpgrade={handleUpgrade}
           />
 
-          {/* 🟢 UPDATED: 3D Mic Button with Bowling Ball Style */}
+          {/* 🟢 3D Mic Button */}
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <TouchableOpacity
               style={[styles.recordButton, isRecording && styles.recording]}
@@ -1344,12 +1341,9 @@ const VoiceToTextScreen = ({ navigation }: any) => {
                 <ActivityIndicator size="large" color="white" />
               ) : (
                 <View style={styles.micContainer}>
-                  {/* Bowling Ball Finger Holes */}
                   <View style={styles.bowlingHole1} />
                   <View style={styles.bowlingHole2} />
                   <View style={styles.bowlingHole3} />
-                  
-                  {/* Glass reflection effect */}
                   <View style={styles.glassReflection} />
                   
                   <Ionicons
@@ -1368,7 +1362,7 @@ const VoiceToTextScreen = ({ navigation }: any) => {
              '🎤 Start Recording'}
           </Text>
 
-          {/* 🟢 ADDED: Word count display */}
+          {/* 🟢 Word count display */}
           {currentWordCount > 0 && (
             <View style={styles.wordCountBadge}>
               <Text style={styles.wordCountText}>
@@ -1377,14 +1371,13 @@ const VoiceToTextScreen = ({ navigation }: any) => {
             </View>
           )}
 
-          {/* 🟢 UPDATED: Smaller Language Selectors */}
+          {/* 🟢 Language Selectors */}
           <View style={styles.languageSelectorsContainer}>
-            {/* FROM LANGUAGE SELECTOR */}
             <TouchableOpacity 
               style={[styles.languageToggle, styles.smallLanguageToggle]}
               onPress={() => {
                 setShowFromLanguageSelector(true);
-                setSearchFromQuery(""); // Reset search when opening
+                setSearchFromQuery("");
               }}
             >
               <Text style={styles.languageEmoji}>{getCurrentFromLanguage().emoji}</Text>
@@ -1395,7 +1388,6 @@ const VoiceToTextScreen = ({ navigation }: any) => {
               <Ionicons name="chevron-down" size={16} color="#D4AF37" />
             </TouchableOpacity>
 
-            {/* 🟢 ADDED: Language Switcher Button */}
             <TouchableOpacity 
               style={styles.switchButton}
               onPress={switchLanguages}
@@ -1403,12 +1395,11 @@ const VoiceToTextScreen = ({ navigation }: any) => {
               <Ionicons name="swap-vertical" size={20} color="#D4AF37" />
             </TouchableOpacity>
 
-            {/* TO LANGUAGE SELECTOR */}
             <TouchableOpacity 
               style={[styles.languageToggle, styles.toLanguageToggle, styles.smallLanguageToggle]}
               onPress={() => {
                 setShowToLanguageSelector(true);
-                setSearchToQuery(""); // Reset search when opening
+                setSearchToQuery("");
               }}
             >
               <Text style={styles.languageEmoji}>{getCurrentToLanguage().emoji}</Text>
@@ -1459,7 +1450,6 @@ const VoiceToTextScreen = ({ navigation }: any) => {
                       <Text style={styles.recordingDetails}>
                         ⏱️ {Math.round(rec.duration / 1000)}s • 🕒 {rec.timestamp}
                       </Text>
-                      {/* 🟢 ADDED: Word count display */}
                       <Text style={styles.wordCountDisplay}>
                         📝 {rec.wordCount} valid words • {rec.translationType || rec.status}
                       </Text>
@@ -1478,7 +1468,6 @@ const VoiceToTextScreen = ({ navigation }: any) => {
                           <Text style={styles.copyButtonText}>Copy</Text>
                         </TouchableOpacity>
                       </View>
-                      {/* 🟢 FIXED: Removed maxHeight constraint to show full text */}
                       <ScrollView style={styles.textScroll} nestedScrollEnabled={true}>
                         <Text style={styles.originalText}>{rec.originalText}</Text>
                       </ScrollView>
@@ -1504,11 +1493,9 @@ const VoiceToTextScreen = ({ navigation }: any) => {
                           <Text style={styles.copyButtonText}>Copy</Text>
                         </TouchableOpacity>
                       </View>
-                      {/* 🟢 FIXED: Removed maxHeight constraint to show full text */}
                       <ScrollView style={styles.textScroll} nestedScrollEnabled={true}>
                         <Text style={styles.translatedText}>{rec.translatedText}</Text>
                       </ScrollView>
-                      {/* 🟢 REMOVED: Speak Translation button completely */}
                     </View>
                   </View>
                 ))}
@@ -1518,12 +1505,12 @@ const VoiceToTextScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      {/* FROM LANGUAGE SELECTOR MODAL with SEARCH */}
+      {/* FROM LANGUAGE SELECTOR MODAL */}
       {showFromLanguageSelector && (
         <LanguageSelectorModal type="from" />
       )}
 
-      {/* TO LANGUAGE SELECTOR MODAL with SEARCH */}
+      {/* TO LANGUAGE SELECTOR MODAL */}
       {showToLanguageSelector && (
         <LanguageSelectorModal type="to" />
       )}
@@ -1531,7 +1518,6 @@ const VoiceToTextScreen = ({ navigation }: any) => {
   );
 };
 
-// 🟢 UPDATED: Added styles for search bar and updated selectors
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   scrollView: { flex: 1 },
@@ -1546,7 +1532,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: 'bold', color: '#D4AF37', textAlign: 'center' },
   subtitle: { fontSize: 12, color: '#888', marginTop: 2 },
   content: { alignItems: 'center', padding: 20 },
-  // 🟢 UPDATED: 3D Mic Button with Bowling Ball Style
   recordButton: {
     width: 120, height: 120, borderRadius: 60, backgroundColor: '#000',
     alignItems: 'center', justifyContent: 'center', marginBottom: 20,
@@ -1560,7 +1545,6 @@ const styles = StyleSheet.create({
     width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center',
     position: 'relative',
   },
-  // Bowling Ball Finger Holes
   bowlingHole1: {
     position: 'absolute',
     top: '30%',
@@ -1609,7 +1593,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#D4AF37', fontSize: 18, fontWeight: '700', marginBottom: 10, textAlign: 'center'
   },
-  // 🟢 ADDED: Word count badge styles
   wordCountBadge: {
     backgroundColor: 'rgba(46, 139, 87, 0.2)',
     paddingHorizontal: 16,
@@ -1631,7 +1614,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 4,
   },
-  // 🟢 UPDATED: Smaller Language Selectors
   languageSelectorsContainer: {
     width: '100%',
     alignItems: 'center',
@@ -1647,7 +1629,6 @@ const styles = StyleSheet.create({
     width: '80%',
   },
   toLanguageToggle: { borderColor: '#2E8B57', marginBottom: 8 },
-  // 🟢 ADDED: Switch button styles
   switchButton: {
     backgroundColor: '#1a1a1a',
     width: 40,
@@ -1696,7 +1677,6 @@ const styles = StyleSheet.create({
   recordingNumber: { color: '#D4AF37', fontSize: 16, fontWeight: 'bold' },
   recordingLanguage: { color: '#2E8B57', fontSize: 12, fontWeight: '600' },
   recordingDetails: { color: '#CCCCCC', fontSize: 12, marginBottom: 6 },
-  // 🟢 FIXED: Removed maxHeight constraints to show full text
   textBox: {
     backgroundColor: '#2a2a2a', borderRadius: 12, padding: 16, marginBottom: 12,
     borderWidth: 1, borderColor: '#444',
@@ -1712,7 +1692,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#D4AF37',
   },
   copyButtonText: { color: '#D4AF37', fontSize: 12, fontWeight: '600', marginLeft: 4 },
-  // 🟢 FIXED: Removed maxHeight to allow full text display
   textScroll: { 
     minHeight: 40, 
     marginBottom: 8 
@@ -1736,7 +1715,6 @@ const styles = StyleSheet.create({
   selectorTitle: {
     color: '#D4AF37', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 20,
   },
-  // 🟢 ADDED: Search bar styles
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1783,7 +1761,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 5,
   },
-  // 🟢 ADDED: Category section styles
   categorySection: {
     marginBottom: 20,
   },
