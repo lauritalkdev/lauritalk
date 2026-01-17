@@ -5,6 +5,8 @@ workflows:
     max_build_duration: 120
     
     environment:
+      node: 20.19.4
+      java: 17
       vars:
         GRADLE_OPTS: "-Xmx3072m -XX:MaxPermSize=512m"
     
@@ -31,7 +33,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - your-email@example.com
+          - lauritalkdev@gmail.com
         notify:
           success: true
           failure: true
