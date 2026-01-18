@@ -1,4 +1,4 @@
-package com.anonymous.lauritalk
+package com.luminix.lauritalk
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
