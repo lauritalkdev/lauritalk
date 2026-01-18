@@ -27,7 +27,7 @@
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.anonymous.lauritalk"
+      "package": "com.luminix.lauritalk"
     },
     "web": {
       "output": "single",
