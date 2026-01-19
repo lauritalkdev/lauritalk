@@ -7,6 +7,8 @@ workflows:
     environment:
       node: 20.19.4
       java: 17
+      android_signing:
+        - lauritalk_keystore
       vars:
         GRADLE_OPTS: "-Xmx3072m"
     
@@ -14,6 +16,14 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
+      
+      - name: Set up signing
+        script: |
+          cd android
+          echo "MYAPP_UPLOAD_STORE_FILE=$CM_KEYSTORE_PATH" >> gradle.properties
+          echo "MYAPP_UPLOAD_KEY_ALIAS=$CM_KEY_ALIAS" >> gradle.properties
+          echo "MYAPP_UPLOAD_STORE_PASSWORD=$CM_KEYSTORE_PASSWORD" >> gradle.properties
+          echo "MYAPP_UPLOAD_KEY_PASSWORD=$CM_KEY_PASSWORD" >> gradle.properties
       
       - name: Build Android APK
         script: |
