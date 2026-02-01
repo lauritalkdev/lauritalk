@@ -8,7 +8,6 @@ import { supabase } from "./supabase";
 LogBox.ignoreLogs([
   "Text strings must be rendered within a <Text> component",
   "[REALTIME] Channel error",
-  "Encountered two children with the same key", // ✅ NEW: Hide duplicate key warning
 ]);
 
 export default function App() {
@@ -40,7 +39,7 @@ export default function App() {
         } else {
           setInitialRoute("Login");
         }
-      }
+      },
     );
 
     return () => {

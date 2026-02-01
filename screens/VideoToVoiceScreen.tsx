@@ -37,7 +37,7 @@ const VideoToVoiceScreen = () => {
           easing: Easing.ease,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [pulseAnim]);
 
@@ -57,7 +57,7 @@ const VideoToVoiceScreen = () => {
           easing: Easing.ease,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [floatAnim]);
 
@@ -77,7 +77,7 @@ const VideoToVoiceScreen = () => {
           easing: Easing.ease,
           useNativeDriver: false,
         }),
-      ])
+      ]),
     ).start();
   }, [glowAnim]);
 
@@ -93,29 +93,50 @@ const VideoToVoiceScreen = () => {
 
   const glowColorInterpolate = glowAnim.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: ["rgba(212, 175, 55, 0.7)", "rgba(212, 175, 55, 1)", "rgba(212, 175, 55, 0.7)"],
+    outputRange: [
+      "rgba(212, 175, 55, 0.7)",
+      "rgba(212, 175, 55, 1)",
+      "rgba(212, 175, 55, 0.7)",
+    ],
   });
 
   const signLanguages = [
     { name: "American Sign Language (ASL)", users: "500,000+ native users" },
     { name: "British Sign Language (BSL)", users: "151,000+ users in UK" },
     { name: "International Sign (ISL)", users: "Global conference language" },
+    { name: "Auslan (Australian)", users: "16,000+ users" },
     { name: "LSF (French Sign)", users: "100,000+ users" },
   ];
 
   const features = [
-    { icon: "videocam", title: "Real-time Sign Language Recognition", color: "#D4AF37" },
-    { icon: "volume-high", title: "Instant Speech Synthesis", color: "#228B22" },
-    { icon: "language", title: "Multiple Sign Language Support", color: "#4169E1" },
+    {
+      icon: "videocam",
+      title: "Real-time Sign Language Recognition",
+      color: "#D4AF37",
+    },
+    {
+      icon: "volume-high",
+      title: "Instant Speech Synthesis",
+      color: "#228B22",
+    },
+    {
+      icon: "language",
+      title: "Multiple Sign Language Support",
+      color: "#4169E1",
+    },
     { icon: "save", title: "Translation History", color: "#D4AF37" },
     { icon: "share", title: "Share Translations", color: "#228B22" },
-    { icon: "accessibility", title: "Accessibility First Design", color: "#4169E1" },
+    {
+      icon: "accessibility",
+      title: "Accessibility First Design",
+      color: "#4169E1",
+    },
   ];
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Back Arrow Button at Top Left */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.backButtonTop}
         onPress={() => navigation.goBack()}
       >
@@ -132,9 +153,12 @@ const VideoToVoiceScreen = () => {
               {
                 top: `${Math.random() * 100}%`,
                 left: `${Math.random() * 100}%`,
-                backgroundColor: index % 4 === 0 ? "#228B22" : 
-                               index % 4 === 1 ? "#4169E1" : 
-                               "#D4AF37",
+                backgroundColor:
+                  index % 4 === 0
+                    ? "#228B22"
+                    : index % 4 === 1
+                      ? "#4169E1"
+                      : "#D4AF37",
                 opacity: 0.1 + Math.random() * 0.2,
               },
             ]}
@@ -142,7 +166,7 @@ const VideoToVoiceScreen = () => {
         ))}
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -150,16 +174,16 @@ const VideoToVoiceScreen = () => {
         {/* Main content */}
         <View style={styles.content}>
           {/* Glowing circle border */}
-          <Animated.View 
+          <Animated.View
             style={[
               styles.glowBorder,
               {
                 borderColor: glowColorInterpolate,
                 opacity: glowInterpolate,
-              }
+              },
             ]}
           />
-          
+
           {/* Main icon with animation */}
           <Animated.View
             style={[
@@ -178,19 +202,26 @@ const VideoToVoiceScreen = () => {
 
           {/* Title with special emphasis */}
           <Text style={styles.title}>🎬 Video to Voice/Text Translation</Text>
-          
+
           {/* Subtitle */}
           <Text style={styles.subtitle}>
-            Empowering the speech and hearing impaired community through real-time sign language to speech conversion
+            Empowering the speech and hearing impaired community through
+            real-time sign language to speech conversion
           </Text>
 
           {/* Mission Statement */}
           <View style={styles.missionCard}>
-            <Ionicons name="heart" size={30} color="#FF6B6B" style={styles.missionIcon} />
+            <Ionicons
+              name="heart"
+              size={30}
+              color="#FF6B6B"
+              style={styles.missionIcon}
+            />
             <Text style={styles.missionTitle}>Our Mission</Text>
             <Text style={styles.missionText}>
-              Breaking communication barriers by converting sign language videos into spoken words instantly, 
-              creating an inclusive environment for everyone.
+              Breaking communication barriers by converting sign language videos
+              into spoken words instantly, creating an inclusive environment for
+              everyone.
             </Text>
           </View>
 
@@ -199,8 +230,17 @@ const VideoToVoiceScreen = () => {
           <View style={styles.featuresGrid}>
             {features.map((feature, index) => (
               <View key={index} style={styles.featureCard}>
-                <View style={[styles.featureIconContainer, { backgroundColor: `${feature.color}20` }]}>
-                  <Ionicons name={feature.icon as any} size={28} color={feature.color} />
+                <View
+                  style={[
+                    styles.featureIconContainer,
+                    { backgroundColor: `${feature.color}20` },
+                  ]}
+                >
+                  <Ionicons
+                    name={feature.icon as any}
+                    size={28}
+                    color={feature.color}
+                  />
                 </View>
                 <Text style={styles.featureCardTitle}>{feature.title}</Text>
               </View>
@@ -226,12 +266,12 @@ const VideoToVoiceScreen = () => {
             <Text style={styles.sectionHeader}>Development Progress</Text>
             <View style={styles.progressContainer}>
               <View style={styles.progressBarBackground}>
-                <Animated.View 
+                <Animated.View
                   style={[
                     styles.progressBarFill,
                     {
                       width: "65%",
-                    }
+                    },
                   ]}
                 />
               </View>
@@ -254,11 +294,19 @@ const VideoToVoiceScreen = () => {
 
           {/* Impact Statement */}
           <View style={styles.impactCard}>
-            <Ionicons name="megaphone" size={40} color="#228B22" style={styles.impactIcon} />
-            <Text style={styles.impactTitle}>Building Bridges of Communication</Text>
+            <Ionicons
+              name="megaphone"
+              size={40}
+              color="#228B22"
+              style={styles.impactIcon}
+            />
+            <Text style={styles.impactTitle}>
+              Building Bridges of Communication
+            </Text>
             <Text style={styles.impactText}>
-              This feature will revolutionize how the speech and hearing impaired community interacts 
-              with the world, providing seamless communication in educational, professional, and social settings.
+              This feature will revolutionize how the speech and hearing
+              impaired community interacts with the world, providing seamless
+              communication in educational, professional, and social settings.
             </Text>
           </View>
 
@@ -270,7 +318,7 @@ const VideoToVoiceScreen = () => {
       </ScrollView>
 
       {/* Floating decorative elements */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.floatingElement1,
           {
@@ -280,8 +328,8 @@ const VideoToVoiceScreen = () => {
       >
         <Ionicons name="videocam" size={24} color="#D4AF37" />
       </Animated.View>
-      
-      <Animated.View 
+
+      <Animated.View
         style={[
           styles.floatingElement2,
           {
@@ -291,8 +339,8 @@ const VideoToVoiceScreen = () => {
       >
         <Ionicons name="volume-high" size={24} color="#228B22" />
       </Animated.View>
-      
-      <Animated.View 
+
+      <Animated.View
         style={[
           styles.floatingElement3,
           {

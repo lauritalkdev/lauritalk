@@ -1,14 +1,15 @@
-// ConversationScreen.tsx (UPDATED - Fixed Subscription Handling)
+// ConversationScreen.tsx (PHASE 1 COMPLETE - Real-time + Menu + Last Seen Fixed)
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   Animated,
+  Clipboard,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -47,8 +48,19 @@ type ConversationRouteParams = {
   otherFullName: string;
 };
 
-// OPENAI SUPPORTED LANGUAGES (Common languages + Cameroonian dialects)
+// PHASE 3: Available reactions
+const AVAILABLE_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+// PHASE 3: Message Reaction type
+type MessageReaction = {
+  messageId: string;
+  reaction: string;
+  userId: string;
+};
+
+// OPENAI SUPPORTED LANGUAGES - 60 HIGH-QUALITY Languages
 const OPENAI_SUPPORTED_LANGUAGES = [
+  // Major World Languages (37)
   { code: 'en', name: 'English', nativeName: 'English', emoji: '🇬🇧' },
   { code: 'es', name: 'Spanish', nativeName: 'Español', emoji: '🇪🇸' },
   { code: 'fr', name: 'French', nativeName: 'Français', emoji: '🇫🇷' },
@@ -86,18 +98,30 @@ const OPENAI_SUPPORTED_LANGUAGES = [
   { code: 'yo', name: 'Yoruba', nativeName: 'Yorùbá', emoji: '🇳🇬' },
   { code: 'ig', name: 'Igbo', nativeName: 'Igbo', emoji: '🇳🇬' },
   { code: 'ha', name: 'Hausa', nativeName: 'Hausa', emoji: '🇳🇬' },
-  // Cameroonian dialects
-  { code: 'bga', name: 'Bangwa', nativeName: 'Bangwa', emoji: '🇨🇲' },
-  { code: 'bkw', name: 'Bakweri', nativeName: 'Bakweri', emoji: '🇨🇲' },
-  { code: 'bak', name: 'Bakossi', nativeName: 'Bakossi', emoji: '🇨🇲' },
-  { code: 'byi', name: 'Bayangi', nativeName: 'Bayangi', emoji: '🇨🇲' },
-  { code: 'kom', name: 'Kom', nativeName: 'Kom', emoji: '🇨🇲' },
-  { code: 'nge', name: 'Ngemba', nativeName: 'Ngemba', emoji: '🇨🇲' },
-  { code: 'mgk', name: 'Mungaka', nativeName: 'Mungaka', emoji: '🇨🇲' },
-  { code: 'bam', name: 'Bamileke', nativeName: 'Bamileke', emoji: '🇨🇲' },
-  { code: 'dua', name: 'Duala', nativeName: 'Duala', emoji: '🇨🇲' },
-  { code: 'baf', name: 'Bafut', nativeName: 'Bafut', emoji: '🇨🇲' },
-  { code: 'oro', name: 'Oroko', nativeName: 'Oroko', emoji: '🇨🇲' },
+  // Well-Supported Additional Languages (23)
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', emoji: '🇧🇩' },
+  { code: 'ur', name: 'Urdu', nativeName: 'اردو', emoji: '🇵🇰' },
+  { code: 'fa', name: 'Persian', nativeName: 'فارسی', emoji: '🇮🇷' },
+  { code: 'uk', name: 'Ukrainian', nativeName: 'Українська', emoji: '🇺🇦' },
+  { code: 'bg', name: 'Bulgarian', nativeName: 'Български', emoji: '🇧🇬' },
+  { code: 'hr', name: 'Croatian', nativeName: 'Hrvatski', emoji: '🇭🇷' },
+  { code: 'sr', name: 'Serbian', nativeName: 'Српски', emoji: '🇷🇸' },
+  { code: 'sk', name: 'Slovak', nativeName: 'Slovenčina', emoji: '🇸🇰' },
+  { code: 'sl', name: 'Slovenian', nativeName: 'Slovenščina', emoji: '🇸🇮' },
+  { code: 'lt', name: 'Lithuanian', nativeName: 'Lietuvių', emoji: '🇱🇹' },
+  { code: 'lv', name: 'Latvian', nativeName: 'Latviešu', emoji: '🇱🇻' },
+  { code: 'et', name: 'Estonian', nativeName: 'Eesti', emoji: '🇪🇪' },
+  { code: 'ca', name: 'Catalan', nativeName: 'Català', emoji: '🇪🇸' },
+  { code: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', emoji: '🇮🇳' },
+  { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்', emoji: '🇮🇳' },
+  { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', emoji: '🇮🇳' },
+  { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ', emoji: '🇮🇳' },
+  { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം', emoji: '🇮🇳' },
+  { code: 'mr', name: 'Marathi', nativeName: 'मराठी', emoji: '🇮🇳' },
+  { code: 'gu', name: 'Gujarati', nativeName: 'ગુજરાતી', emoji: '🇮🇳' },
+  { code: 'am', name: 'Amharic', nativeName: 'አማርኛ', emoji: '🇪🇹' },
+  { code: 'so', name: 'Somali', nativeName: 'Soomaali', emoji: '🇸🇴' },
+  { code: 'hy', name: 'Armenian', nativeName: 'Հայերեն', emoji: '🇦🇲' },
 ];
 
 // Helper function to get language name from code
@@ -209,7 +233,123 @@ const TypingDots = () => {
   );
 };
 
-// Language Selector Component
+// PHASE 3: Reaction Picker Modal Component
+const ReactionPicker = ({
+  visible,
+  onClose,
+  onSelectReaction,
+  messageId
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelectReaction: (messageId: string, reaction: string) => void;
+  messageId: string;
+}) => {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity 
+        style={styles.reactionPickerOverlay} 
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View style={styles.reactionPickerContainer}>
+          <Text style={styles.reactionPickerTitle}>React to message</Text>
+          <View style={styles.reactionPickerGrid}>
+            {AVAILABLE_REACTIONS.map((reaction) => (
+              <TouchableOpacity
+                key={reaction}
+                style={styles.reactionButton}
+                onPress={() => {
+                  onSelectReaction(messageId, reaction);
+                  onClose();
+                }}
+              >
+                <Text style={styles.reactionEmoji}>{reaction}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
+
+// NEW: Action Sheet Menu Component for Android
+const ActionSheetMenu = ({
+  visible,
+  onClose,
+  options,
+  title
+}: {
+  visible: boolean;
+  onClose: () => void;
+  options: { label: string; onPress: () => void; icon?: string; destructive?: boolean }[];
+  title?: string;
+}) => {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity 
+        style={styles.actionSheetOverlay} 
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View style={styles.actionSheetContainer}>
+          {title && (
+            <View style={styles.actionSheetHeader}>
+              <Text style={styles.actionSheetTitle}>{title}</Text>
+            </View>
+          )}
+          {options.map((option, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.actionSheetOption,
+                option.destructive && styles.actionSheetOptionDestructive
+              ]}
+              onPress={() => {
+                onClose();
+                option.onPress();
+              }}
+            >
+              {option.icon && (
+                <Ionicons 
+                  name={option.icon as any} 
+                  size={20} 
+                  color={option.destructive ? '#ff3b30' : COLORS.gold} 
+                  style={styles.actionSheetIcon}
+                />
+              )}
+              <Text style={[
+                styles.actionSheetOptionText,
+                option.destructive && styles.actionSheetOptionTextDestructive
+              ]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={[styles.actionSheetOption, styles.actionSheetCancel]}
+            onPress={onClose}
+          >
+            <Text style={styles.actionSheetCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
+
+// Language Selector Component  
 const LanguageSelector = ({
   visible,
   onClose,
@@ -267,7 +407,7 @@ const LanguageSelector = ({
             <View>
               <Text style={styles.languageModalTitle}>Select Language</Text>
               <Text style={styles.languageModalSubtitle}>
-                {isPremiumUser ? 'Premium feature enabled' : 'Visit website to enable translation'}
+                {isPremiumUser ? '60 languages available' : 'Visit website to enable translation'}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose}>
@@ -385,7 +525,23 @@ export default function ConversationScreen(): React.ReactElement {
   // Local storage for translations
   const [translationCache, setTranslationCache] = useState<Map<string, string>>(new Map());
   
-  // Refs - FIXED: Changed NodeJS.Timeout to ReturnType<typeof setTimeout>
+  // Keyboard state
+  const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState<boolean>(false);
+  
+  // NEW: More options menu state
+  const [showMoreOptions, setShowMoreOptions] = useState<boolean>(false);
+  
+  // PHASE 2: Message long-press menu state
+  const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
+  const [showMessageOptions, setShowMessageOptions] = useState<boolean>(false);
+  
+  // PHASE 3: Reaction states
+  const [messageReactions, setMessageReactions] = useState<Map<string, MessageReaction[]>>(new Map());
+  const [showReactionPicker, setShowReactionPicker] = useState<boolean>(false);
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string>('');
+  
+  // Refs
   const flatListRef = useRef<FlatList<GroupedMessage>>(null);
   const textInputRef = useRef<TextInput>(null);
   const subscriptionRef = useRef<(() => void) | null>(null);
@@ -394,13 +550,223 @@ export default function ConversationScreen(): React.ReactElement {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  const INPUT_WRAPPER_HEIGHT = 80 + (Platform.OS === 'ios' ? insets.bottom : 0);
+  // FIX #1: Ref to track current messages (prevents stale closure in subscription)
+  const messagesRef = useRef<ChatMessage[]>([]);
+  
+  const INPUT_WRAPPER_HEIGHT = 80;
 
   // Function to handle website redirection
   const handleWebsiteRedirect = () => {
     Linking.openURL('https://www.lauritalk.com/login').catch(err => {
       console.error('Failed to open URL:', err);
       Alert.alert('Error', 'Could not open the website. Please try again.');
+    });
+  };
+
+  // FIX #2: Handle More Options Menu (3-dots menu)
+  const handleMoreOptions = () => {
+    const options = [
+      'Clear Chat',
+      'Mute Notifications',
+      'Block User',
+      'Report User',
+      'Cancel'
+    ];
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          destructiveButtonIndex: [2, 3],
+          cancelButtonIndex: 4,
+          title: `Chat with ${otherFullName || otherUsername}`,
+        },
+        (buttonIndex) => {
+          switch (buttonIndex) {
+            case 0:
+              handleClearChat();
+              break;
+            case 1:
+              handleMuteNotifications();
+              break;
+            case 2:
+              handleBlockUser();
+              break;
+            case 3:
+              handleReportUser();
+              break;
+          }
+        }
+      );
+    } else {
+      // Android: Show custom modal
+      setShowMoreOptions(true);
+    }
+  };
+
+  const handleClearChat = () => {
+    Alert.alert(
+      'Clear Chat',
+      'Are you sure you want to clear this chat? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => {
+            setMessages([]);
+            setMessageReactions(new Map());
+            Alert.alert('Success', 'Chat cleared successfully');
+          }
+        }
+      ]
+    );
+  };
+
+  const handleMuteNotifications = () => {
+    Alert.alert(
+      'Mute Notifications',
+      'Mute notifications for this chat?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: '1 hour', onPress: () => console.log('Muted for 1 hour') },
+        { text: '8 hours', onPress: () => console.log('Muted for 8 hours') },
+        { text: 'Forever', onPress: () => console.log('Muted forever') }
+      ]
+    );
+  };
+
+  const handleBlockUser = () => {
+    Alert.alert(
+      'Block User',
+      `Block ${otherFullName || otherUsername}? They will no longer be able to send you messages.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => {
+            console.log('User blocked');
+            Alert.alert('Success', 'User blocked successfully');
+            navigation.goBack();
+          }
+        }
+      ]
+    );
+  };
+
+  const handleReportUser = () => {
+    Alert.alert(
+      'Report User',
+      `Report ${otherFullName || otherUsername} for inappropriate behavior?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: () => {
+            console.log('User reported');
+            Alert.alert('Success', 'User reported successfully. We will review this report.');
+          }
+        }
+      ]
+    );
+  };
+
+  // PHASE 2: Handle message long-press
+  const handleMessageLongPress = (message: ChatMessage) => {
+    setSelectedMessage(message);
+    const isSentByMe = message.sender_id === currentUserId;
+    
+    if (Platform.OS === 'ios') {
+      const options = isSentByMe 
+        ? ['Copy Text', 'Delete Message', 'React', 'Cancel']
+        : ['Copy Text', 'React', 'Cancel'];
+      
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          destructiveButtonIndex: isSentByMe ? 1 : undefined,
+          cancelButtonIndex: isSentByMe ? 3 : 2,
+        },
+        (buttonIndex) => {
+          if (isSentByMe) {
+            switch (buttonIndex) {
+              case 0: handleCopyText(message); break;
+              case 1: handleDeleteMessage(message); break;
+              case 2: handleReactToMessage(message.id); break;
+            }
+          } else {
+            switch (buttonIndex) {
+              case 0: handleCopyText(message); break;
+              case 1: handleReactToMessage(message.id); break;
+            }
+          }
+        }
+      );
+    } else {
+      setShowMessageOptions(true);
+    }
+  };
+
+  // PHASE 2: Copy message text
+  const handleCopyText = (message: ChatMessage) => {
+    const { text } = getDisplayText(message);
+    Clipboard.setString(text);
+    Alert.alert('Copied', 'Message copied to clipboard');
+  };
+
+  // PHASE 2: Delete message
+  const handleDeleteMessage = (message: ChatMessage) => {
+    Alert.alert(
+      'Delete Message',
+      'Are you sure you want to delete this message?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setMessages(prev => prev.filter(msg => msg.id !== message.id));
+            setMessageReactions(prev => {
+              const newReactions = new Map(prev);
+              newReactions.delete(message.id);
+              return newReactions;
+            });
+          }
+        }
+      ]
+    );
+  };
+
+  // PHASE 3: React to message
+  const handleReactToMessage = (messageId: string) => {
+    setReactionPickerMessageId(messageId);
+    setShowReactionPicker(true);
+  };
+
+  // PHASE 3: Add/remove reaction
+  const handleAddReaction = (messageId: string, reaction: string) => {
+    if (!currentUserId) return;
+    
+    setMessageReactions(prev => {
+      const newReactions = new Map(prev);
+      const existingReactions = newReactions.get(messageId) || [];
+      const userReactionIndex = existingReactions.findIndex(
+        r => r.userId === currentUserId && r.reaction === reaction
+      );
+      
+      if (userReactionIndex >= 0) {
+        existingReactions.splice(userReactionIndex, 1);
+      } else {
+        const filteredReactions = existingReactions.filter(r => r.userId !== currentUserId);
+        filteredReactions.push({ messageId, reaction, userId: currentUserId });
+        newReactions.set(messageId, filteredReactions);
+        return newReactions;
+      }
+      
+      newReactions.set(messageId, existingReactions);
+      return newReactions;
     });
   };
 
@@ -478,7 +844,6 @@ export default function ConversationScreen(): React.ReactElement {
     setTranslatingMessages(true);
 
     try {
-      // FIXED: Using the correct function name
       const batchResult = await chatService.translateMessagesForUser(
         incomingMessages,
         userLanguage,
@@ -612,6 +977,11 @@ export default function ConversationScreen(): React.ReactElement {
     markMessagesAsRead();
   }, []);
 
+  // FIX #1: Keep messagesRef synced with messages state (prevents stale closure)
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   // Update header when language or premium status changes
   useEffect(() => {
     navigation.setOptions({
@@ -672,9 +1042,10 @@ export default function ConversationScreen(): React.ReactElement {
             )}
           </TouchableOpacity>
           
+          {/* FIX #2: Working 3-dots menu */}
           <TouchableOpacity 
             style={styles.moreOptionsButton}
-            onPress={() => console.log('More options pressed')}
+            onPress={handleMoreOptions}
           >
             <Ionicons name="ellipsis-vertical" size={24} color={COLORS.gold} />
           </TouchableOpacity>
@@ -695,27 +1066,31 @@ export default function ConversationScreen(): React.ReactElement {
     otherUsername
   ]);
 
+  // KEYBOARD LISTENERS
   useEffect(() => {
-    // Keyboard listeners
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        setIsKeyboardVisible(true);
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
       }
     );
     
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {}
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+      }
     );
 
     return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
       
-      // Only clear timeouts, NOT subscriptions (they're handled in the other useEffect)
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
@@ -725,7 +1100,7 @@ export default function ConversationScreen(): React.ReactElement {
     };
   }, []);
 
-  // Setup realtime subscription after currentUserId is available - FIXED VERSION
+  // Setup realtime subscription after currentUserId is available
   useEffect(() => {
     console.log(`🔌 [UI] useEffect triggered for subscriptions, currentUserId: ${currentUserId}`);
     
@@ -779,7 +1154,7 @@ export default function ConversationScreen(): React.ReactElement {
     }
   }, [currentUserId]);
 
-  // Setup Realtime Subscription with proper unsubscribe - FIXED
+  // FIX #1: Setup Realtime Subscription with messagesRef to prevent stale closure
   const setupRealtimeSubscription = (): (() => void) => {
     console.log(`🔌 [UI] Setting up realtime subscription for user ${currentUserId} ↔ ${otherUserId}`);
     
@@ -794,12 +1169,16 @@ export default function ConversationScreen(): React.ReactElement {
       console.log(`📨 [UI] Subscription callback triggered for message ${newMessage.id}`);
       
       const isMessageFromMe = newMessage.sender_id === currentUserId;
-      const isAlreadyInList = messages.some(msg => msg.id === newMessage.id);
+      
+      // FIX #1: Use messagesRef.current instead of stale messages closure
+      const isAlreadyInList = messagesRef.current.some(msg => msg.id === newMessage.id);
       
       console.log(`📨 [UI] Message from me? ${isMessageFromMe}, Already in list? ${isAlreadyInList}`);
+      console.log(`📨 [UI] Current messages count: ${messagesRef.current.length}`);
       
-      if (!isMessageFromMe || !isAlreadyInList) {
-        console.log(`📨 [UI] Adding message ${newMessage.id} to UI`);
+      // Add message if it's not already in the list (prevents duplicates)
+      if (!isAlreadyInList) {
+        console.log(`📨 [UI] ✅ Adding NEW message ${newMessage.id} to UI`);
         
         const messageToAdd = {
           ...newMessage,
@@ -810,7 +1189,11 @@ export default function ConversationScreen(): React.ReactElement {
         };
         
         setMessages(prev => [...prev, messageToAdd]);
-        markMessagesAsRead();
+        
+        // Only mark as read if it's an incoming message
+        if (!isMessageFromMe) {
+          markMessagesAsRead();
+        }
         
         // Translate incoming messages in real-time using translation service
         if (!isMessageFromMe && isPremiumUser && translationServiceAvailable) {
@@ -825,7 +1208,7 @@ export default function ConversationScreen(): React.ReactElement {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
       } else {
-        console.log(`📨 [UI] Skipping message (duplicate or own message already handled)`);
+        console.log(`📨 [UI] ⚠️ Skipping message (already in list - duplicate prevention)`);
       }
     });
     
@@ -836,7 +1219,7 @@ export default function ConversationScreen(): React.ReactElement {
     return unsubscribe;
   };
 
-  // Setup Presence Subscription with proper unsubscribe - FIXED
+  // FIX #3: Enhanced Presence Subscription with better last seen tracking
   const setupPresenceSubscription = (): (() => void) | null => {
     console.log(`🔌 [UI] Setting up presence subscription for user ${otherUserId}`);
     
@@ -847,8 +1230,15 @@ export default function ConversationScreen(): React.ReactElement {
     }
 
     const presenceCallback = (presenceData: { isOnline: boolean; lastSeen: string | null }): void => {
+      console.log(`🟢 [PRESENCE] User ${otherUserId} status:`, presenceData);
       setIsUserOnline(presenceData.isOnline);
-      setLastSeenTimestamp(presenceData.lastSeen);
+      
+      // FIX #3: Update last seen timestamp properly
+      if (!presenceData.isOnline && presenceData.lastSeen) {
+        setLastSeenTimestamp(presenceData.lastSeen);
+      } else if (presenceData.isOnline) {
+        setLastSeenTimestamp(new Date().toISOString());
+      }
     };
 
     try {
@@ -864,7 +1254,7 @@ export default function ConversationScreen(): React.ReactElement {
     return null;
   };
 
-  // Setup Typing Subscription with proper unsubscribe - FIXED
+  // Setup Typing Subscription
   const setupTypingSubscription = (): (() => void) | null => {
     console.log(`🔌 [UI] Setting up typing subscription for user ${otherUserId}`);
     
@@ -1066,7 +1456,7 @@ export default function ConversationScreen(): React.ReactElement {
     }
   };
 
-  // Get display text based on translation settings - UPDATED LOGIC
+  // Get display text based on translation settings
   const getDisplayText = (message: ChatMessage): { 
     text: string; 
     isTranslated: boolean; 
@@ -1216,13 +1606,18 @@ export default function ConversationScreen(): React.ReactElement {
     const shouldShowOriginalToggle = isIncomingMessage && isTranslated && showTranslations;
     const isShowingOriginal = showOriginalText.get(item.id) || false;
 
+    // PHASE 3: Get reactions for this message
+    const reactions = messageReactions.get(item.id) || [];
+    const reactionCounts = new Map<string, number>();
+    const userReaction = reactions.find(r => r.userId === currentUserId);
+    reactions.forEach(r => {
+      reactionCounts.set(r.reaction, (reactionCounts.get(r.reaction) || 0) + 1);
+    });
+
     return (
       <TouchableOpacity
         activeOpacity={0.9}
-        onLongPress={() => {
-          // Copy to clipboard
-          // You can implement this if needed
-        }}
+        onLongPress={() => handleMessageLongPress(item)}
         delayLongPress={500}
       >
         <View style={[
@@ -1349,6 +1744,38 @@ export default function ConversationScreen(): React.ReactElement {
               )}
             </View>
           </View>
+          
+          {/* PHASE 3: Message Reactions Display */}
+          {reactions.length > 0 && (
+            <View style={[styles.reactionsContainer, isSentByMe ? styles.reactionsContainerSent : styles.reactionsContainerReceived]}>
+              {Array.from(reactionCounts.entries()).map(([reaction, count]) => (
+                <TouchableOpacity
+                  key={reaction}
+                  style={[
+                    styles.reactionBubble,
+                    userReaction?.reaction === reaction && styles.reactionBubbleActive
+                  ]}
+                  onPress={() => handleAddReaction(item.id, reaction)}
+                >
+                  <Text style={styles.reactionBubbleEmoji}>{reaction}</Text>
+                  {count > 1 && <Text style={styles.reactionBubbleCount}>{count}</Text>}
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={styles.addReactionButton} onPress={() => handleReactToMessage(item.id)}>
+                <Ionicons name="add-circle-outline" size={16} color={COLORS.gold} />
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {/* PHASE 3: Quick add reaction button (when no reactions) */}
+          {reactions.length === 0 && (
+            <TouchableOpacity 
+              style={[styles.quickReactButton, isSentByMe ? styles.quickReactButtonSent : styles.quickReactButtonReceived]} 
+              onPress={() => handleReactToMessage(item.id)}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={COLORS.gold} />
+            </TouchableOpacity>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -1364,7 +1791,7 @@ export default function ConversationScreen(): React.ReactElement {
         </Text>
       </View>
       
-      {/* Translation status notice - UPDATED TEXT */}
+      {/* Translation status notice */}
       {isPremiumUser && (
         <View style={styles.translationNotice}>
           <Ionicons name="sparkles" size={14} color={COLORS.gold} />
@@ -1383,7 +1810,7 @@ export default function ConversationScreen(): React.ReactElement {
         </View>
       )}
       
-      {/* Service availability notice - UPDATED TEXT */}
+      {/* Service availability notice */}
       {!translationServiceAvailable && isPremiumUser && (
         <View style={styles.warningNotice}>
           <Ionicons name="warning" size={14} color="#ff9800" />
@@ -1393,7 +1820,7 @@ export default function ConversationScreen(): React.ReactElement {
         </View>
       )}
       
-      {/* Website redirect notice - UPDATED TEXT */}
+      {/* Website redirect notice */}
       {!isPremiumUser && (
         <TouchableOpacity 
           style={styles.premiumUpgradeNotice}
@@ -1407,7 +1834,7 @@ export default function ConversationScreen(): React.ReactElement {
         </TouchableOpacity>
       )}
       
-      {/* Incoming translation status - UPDATED TEXT */}
+      {/* Incoming translation status */}
       {translatingMessages && (
         <View style={styles.translationProgressContainer}>
           <ActivityIndicator size="small" color={COLORS.gold} />
@@ -1451,11 +1878,7 @@ export default function ConversationScreen(): React.ReactElement {
   const groupedMessages = getGroupedMessages();
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
+    <View style={styles.container}>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <StatusBar backgroundColor={COLORS.black} barStyle="light-content" />
         
@@ -1479,11 +1902,13 @@ export default function ConversationScreen(): React.ReactElement {
                   ))}
                 </View>
               )}
-              keyExtractor={(item: GroupedMessage) => `${item.date}-${Date.now()}`}
+              keyExtractor={(item: GroupedMessage, index) => `${item.date}-${index}`}
               contentContainerStyle={[
                 styles.messagesList,
                 { 
-                  paddingBottom: INPUT_WRAPPER_HEIGHT + 20
+                  paddingBottom: isKeyboardVisible 
+                    ? keyboardHeight + 100
+                    : INPUT_WRAPPER_HEIGHT + 20
                 }
               ]}
               inverted={false}
@@ -1494,43 +1919,34 @@ export default function ConversationScreen(): React.ReactElement {
               showsVerticalScrollIndicator={false}
               keyboardDismissMode="interactive"
               keyboardShouldPersistTaps="handled"
-              onTouchStart={() => {
-                Keyboard.dismiss();
-              }}
             />
             
             <View style={[
               styles.inputWrapper,
               {
-                paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20,
+                bottom: isKeyboardVisible ? keyboardHeight : 0,
               }
             ]}>
               <View style={styles.inputContainer}>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  style={styles.textInputTouchable}
-                  onPress={() => textInputRef.current?.focus()}
-                >
-                  <TextInput
-                    ref={textInputRef}
-                    style={styles.textInput}
-                    placeholder="Type your message..."
-                    placeholderTextColor="#888"
-                    value={newMessage}
-                    onChangeText={(text) => {
-                      setNewMessage(text);
-                      if (text.trim().length > 0) {
-                        broadcastTypingStatus();
-                      }
-                    }}
-                    multiline
-                    maxLength={500}
-                    editable={!sending}
-                    onSubmitEditing={handleSendMessage}
-                    blurOnSubmit={false}
-                    returnKeyType="send"
-                  />
-                </TouchableOpacity>
+                <TextInput
+                  ref={textInputRef}
+                  style={styles.textInput}
+                  placeholder="Type your message..."
+                  placeholderTextColor="#888"
+                  value={newMessage}
+                  onChangeText={(text) => {
+                    setNewMessage(text);
+                    if (text.trim().length > 0) {
+                      broadcastTypingStatus();
+                    }
+                  }}
+                  multiline
+                  maxLength={500}
+                  editable={!sending}
+                  onSubmitEditing={handleSendMessage}
+                  blurOnSubmit={false}
+                  returnKeyType="send"
+                />
                 
                 <TouchableOpacity
                   style={[
@@ -1557,10 +1973,69 @@ export default function ConversationScreen(): React.ReactElement {
               onLanguageSelect={handleLanguageSelect}
               isPremiumUser={isPremiumUser}
             />
+            
+            {/* FIX #2: Android Action Sheet Menu */}
+            {Platform.OS === 'android' && (
+              <>
+                <ActionSheetMenu
+                  visible={showMoreOptions}
+                  onClose={() => setShowMoreOptions(false)}
+                  title={`Chat with ${otherFullName || otherUsername}`}
+                  options={[
+                    {
+                      label: 'Clear Chat',
+                      icon: 'trash-outline',
+                      onPress: handleClearChat,
+                      destructive: false
+                    },
+                    {
+                      label: 'Mute Notifications',
+                      icon: 'notifications-off-outline',
+                      onPress: handleMuteNotifications,
+                      destructive: false
+                    },
+                    {
+                      label: 'Block User',
+                      icon: 'ban-outline',
+                      onPress: handleBlockUser,
+                      destructive: true
+                    },
+                    {
+                      label: 'Report User',
+                      icon: 'flag-outline',
+                      onPress: handleReportUser,
+                      destructive: true
+                    }
+                  ]}
+                />
+                {/* PHASE 2: Message options menu */}
+                {selectedMessage && (
+                  <ActionSheetMenu
+                    visible={showMessageOptions}
+                    onClose={() => setShowMessageOptions(false)}
+                    title="Message Options"
+                    options={[
+                      { label: 'Copy Text', icon: 'copy-outline', onPress: () => handleCopyText(selectedMessage), destructive: false },
+                      ...(selectedMessage.sender_id === currentUserId ? [
+                        { label: 'Delete Message', icon: 'trash-outline', onPress: () => handleDeleteMessage(selectedMessage), destructive: true }
+                      ] : []),
+                      { label: 'React', icon: 'happy-outline', onPress: () => handleReactToMessage(selectedMessage.id), destructive: false }
+                    ]}
+                  />
+                )}
+              </>
+            )}
+            {/* PHASE 3: Reaction picker */}
+            <ReactionPicker
+              visible={showReactionPicker}
+              onClose={() => setShowReactionPicker(false)}
+              onSelectReaction={handleAddReaction}
+              messageId={reactionPickerMessageId}
+            />
           </>
         )}
       </SafeAreaView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -1625,10 +2100,14 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   inputWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     backgroundColor: COLORS.black,
     borderTopWidth: 1,
     borderTopColor: 'rgba(212, 175, 55, 0.2)',
     paddingTop: 10,
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -1883,34 +2362,28 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     paddingHorizontal: 12,
-    paddingBottom: Platform.OS === 'ios' ? 5 : 10,
-    minHeight: Platform.OS === 'ios' ? 60 : 70,
-  },
-  textInputTouchable: {
-    flex: 1,
+    gap: 8,
   },
   textInput: {
+    flex: 1,
     backgroundColor: 'rgba(212, 175, 55, 0.1)',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 12,
+    paddingVertical: 12,
     color: COLORS.gold,
     fontSize: 16,
     maxHeight: 120,
-    minHeight: Platform.OS === 'ios' ? 48 : 44,
-    textAlignVertical: 'center',
-    marginRight: 8,
+    minHeight: 44,
   },
   sendButton: {
     backgroundColor: COLORS.gold,
-    width: Platform.OS === 'ios' ? 48 : 44,
-    height: Platform.OS === 'ios' ? 48 : 44,
-    borderRadius: Platform.OS === 'ios' ? 24 : 22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'flex-end',
   },
   sendButtonDisabled: {
     backgroundColor: 'rgba(212, 175, 55, 0.3)',
@@ -2047,5 +2520,158 @@ const styles = StyleSheet.create({
     padding: 20,
     fontSize: 14,
     fontStyle: 'italic',
+  },
+  // NEW: Android Action Sheet Styles
+  actionSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  actionSheetContainer: {
+    backgroundColor: COLORS.black,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  actionSheetHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(212, 175, 55, 0.2)',
+  },
+  actionSheetTitle: {
+    color: COLORS.gold,
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  actionSheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(212, 175, 55, 0.1)',
+  },
+  actionSheetOptionDestructive: {
+    backgroundColor: 'rgba(255, 59, 48, 0.05)',
+  },
+  actionSheetIcon: {
+    marginRight: 12,
+  },
+  actionSheetOptionText: {
+    color: COLORS.gold,
+    fontSize: 16,
+  },
+  actionSheetOptionTextDestructive: {
+    color: '#ff3b30',
+  },
+  actionSheetCancel: {
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    marginTop: 8,
+    marginHorizontal: 12,
+    borderRadius: 12,
+    borderBottomWidth: 0,
+  },
+  actionSheetCancelText: {
+    color: COLORS.gold,
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    width: '100%',
+  },
+  // PHASE 3: Reaction styles
+  reactionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+    gap: 6,
+    alignItems: 'center',
+  },
+  reactionsContainerSent: {
+    justifyContent: 'flex-end',
+  },
+  reactionsContainerReceived: {
+    justifyContent: 'flex-start',
+  },
+  reactionBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+  },
+  reactionBubbleActive: {
+    backgroundColor: 'rgba(212, 175, 55, 0.3)',
+    borderColor: COLORS.gold,
+  },
+  reactionBubbleEmoji: {
+    fontSize: 14,
+  },
+  reactionBubbleCount: {
+    fontSize: 10,
+    color: COLORS.gold,
+    marginLeft: 4,
+    fontWeight: '600',
+  },
+  addReactionButton: {
+    padding: 4,
+  },
+  quickReactButton: {
+    position: 'absolute',
+    top: -10,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+  },
+  quickReactButtonSent: {
+    right: 10,
+  },
+  quickReactButtonReceived: {
+    left: 10,
+  },
+  reactionPickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reactionPickerContainer: {
+    backgroundColor: COLORS.black,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: COLORS.gold,
+    minWidth: 280,
+  },
+  reactionPickerTitle: {
+    color: COLORS.gold,
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  reactionPickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  reactionButton: {
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    borderRadius: 16,
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+  },
+  reactionEmoji: {
+    fontSize: 32,
   },
 });

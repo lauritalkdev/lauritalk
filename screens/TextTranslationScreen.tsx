@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as Speech from 'expo-speech';
+import * as Speech from "expo-speech";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Clipboard, // 🟢 ADDED: Import Clipboard
+  Clipboard, // 🟢 ADDED: Import Clipboa1rd
   FlatList,
   Modal,
   ScrollView,
@@ -29,62 +29,62 @@ const saveTranslation = async (translationData: {
   target_language: string;
 }) => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
-      console.log('User not logged in, skipping translation save');
+      console.log("User not logged in, skipping translation save");
       return false;
     }
 
-    const { error } = await supabase
-      .from('user_translations')
-      .insert([
-        {
-          user_id: user.id,
-          ...translationData,
-          translation_type: 'text'
-        }
-      ]);
+    const { error } = await supabase.from("user_translations").insert([
+      {
+        user_id: user.id,
+        ...translationData,
+        translation_type: "text",
+      },
+    ]);
 
     if (error) {
-      console.error('Error saving translation to database:', error);
+      console.error("Error saving translation to database:", error);
       return false;
     }
 
-    console.log('Translation saved successfully');
+    console.log("Translation saved successfully");
     return true;
   } catch (error) {
-    console.error('Unexpected error saving translation:', error);
+    console.error("Unexpected error saving translation:", error);
     return false;
   }
 };
 
 // 🟢 IMPORT DICTIONARIES
-import enBafut from '../assets/dictionaries/EnglishtoBafut.json';
-import enBakossi from '../assets/dictionaries/EnglishtoBakossi.json';
-import enBakwere from '../assets/dictionaries/EnglishtoBakwere.json';
-import enBamileke from '../assets/dictionaries/EnglishtoBamileke.json';
-import enBangwa from '../assets/dictionaries/EnglishtoBangwa.json';
-import enBayangi from '../assets/dictionaries/EnglishtoBayangi.json';
-import enDuala from '../assets/dictionaries/EnglishtoDuala.json';
-import enKom from '../assets/dictionaries/EnglishtoKom.json';
-import enMungaka from '../assets/dictionaries/EnglishtoMungaka.json';
-import enNgemba from '../assets/dictionaries/EnglishtoNgemba.json';
-import enOroko from '../assets/dictionaries/EnglishtoOroko.json';
+import enBafut from "../assets/dictionaries/EnglishtoBafut.json";
+import enBakossi from "../assets/dictionaries/EnglishtoBakossi.json";
+import enBakwere from "../assets/dictionaries/EnglishtoBakwere.json";
+import enBamileke from "../assets/dictionaries/EnglishtoBamileke.json";
+import enBangwa from "../assets/dictionaries/EnglishtoBangwa.json";
+import enBayangi from "../assets/dictionaries/EnglishtoBayangi.json";
+import enDuala from "../assets/dictionaries/EnglishtoDuala.json";
+import enKom from "../assets/dictionaries/EnglishtoKom.json";
+import enMungaka from "../assets/dictionaries/EnglishtoMungaka.json";
+import enNgemba from "../assets/dictionaries/EnglishtoNgemba.json";
+import enOroko from "../assets/dictionaries/EnglishtoOroko.json";
 
 // 🟢 MAP DICTIONARIES
 const dictionaries: { [key: string]: any } = {
-  'bkw': enBakwere,
-  'bam': enBamileke,
-  'baf': enBafut,
-  'bak': enBakossi,
-  'bga': enBangwa,
-  'kom': enKom,
-  'dua': enDuala,
-  'nge': enNgemba,
-  'byi': enBayangi,
-  'mgk': enMungaka,
-  'oro': enOroko,
+  bkw: enBakwere,
+  bam: enBamileke,
+  baf: enBafut,
+  bak: enBakossi,
+  bga: enBangwa,
+  kom: enKom,
+  dua: enDuala,
+  nge: enNgemba,
+  byi: enBayangi,
+  mgk: enMungaka,
+  oro: enOroko,
 };
 
 export default function TextTranslationScreen({ navigation }: any) {
@@ -98,7 +98,7 @@ export default function TextTranslationScreen({ navigation }: any) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { 
+  const {
     checkAndUpdateWordCount,
     modalVisible,
     modalType,
@@ -108,14 +108,26 @@ export default function TextTranslationScreen({ navigation }: any) {
     closeModal,
     upgradeToPremium,
     loadLimitStatus,
-    calculateWordCount
+    calculateWordCount,
   } = useWordLimits();
 
-  const cameroonianDialects = ['bga', 'bkw', 'bak', 'byi', 'kom', 'nge', 'mgk', 'bam', 'dua', 'baf', 'oro'];
+  const cameroonianDialects = [
+    "bga",
+    "bkw",
+    "bak",
+    "byi",
+    "kom",
+    "nge",
+    "mgk",
+    "bam",
+    "dua",
+    "baf",
+    "oro",
+  ];
 
   const languageCategories = [
     {
-      name: 'Europe',
+      name: "Europe",
       languages: [
         { code: "en", name: "English" },
         { code: "es", name: "Spanish" },
@@ -160,10 +172,10 @@ export default function TextTranslationScreen({ navigation }: any) {
         { code: "br", name: "Breton" },
         { code: "os", name: "Ossetian" },
         { code: "csb", name: "Kashubian" },
-      ]
+      ],
     },
     {
-      name: 'Asia',
+      name: "Asia",
       languages: [
         { code: "zh-Hans", name: "Chinese (Simplified)" },
         { code: "zh-Hant", name: "Chinese (Traditional)" },
@@ -201,10 +213,10 @@ export default function TextTranslationScreen({ navigation }: any) {
         { code: "hmn", name: "Hmong" },
         { code: "mnw", name: "Mon" },
         { code: "shn", name: "Shan" },
-      ]
+      ],
     },
     {
-      name: 'Middle East & Central Asia',
+      name: "Middle East & Central Asia",
       languages: [
         { code: "ar", name: "Arabic" },
         { code: "fa", name: "Persian" },
@@ -229,10 +241,10 @@ export default function TextTranslationScreen({ navigation }: any) {
         { code: "kaa", name: "Karakalpak" },
         { code: "kum", name: "Kumyk" },
         { code: "nog", name: "Nogai" },
-      ]
+      ],
     },
     {
-      name: 'Africa',
+      name: "Africa",
       languages: [
         { code: "sw", name: "Swahili" },
         { code: "am", name: "Amharic" },
@@ -271,10 +283,10 @@ export default function TextTranslationScreen({ navigation }: any) {
         { code: "lua", name: "Tshiluba" },
         { code: "tig", name: "Tigre" },
         { code: "aa", name: "Afar" },
-      ]
+      ],
     },
     {
-      name: 'Americas & Oceania',
+      name: "Americas & Oceania",
       languages: [
         { code: "en-US", name: "English (US)" },
         { code: "es-419", name: "Spanish (Latin America)" },
@@ -293,19 +305,19 @@ export default function TextTranslationScreen({ navigation }: any) {
         { code: "cr", name: "Cree" },
         { code: "iu", name: "Inuktitut" },
         { code: "arn", name: "Mapudungun" },
-      ]
+      ],
     },
     {
-      name: 'Constructed & Other Languages',
+      name: "Constructed & Other Languages",
       languages: [
         { code: "eo", name: "Esperanto" },
         { code: "ia", name: "Interlingua" },
         { code: "tpi", name: "Tok Pisin" },
         { code: "pap", name: "Papiamento" },
-      ]
+      ],
     },
     {
-      name: 'Cameroonian Dialects',
+      name: "Cameroonian Dialects",
       languages: [
         { code: "bga", name: "Bangwa" },
         { code: "bkw", name: "Bakweri" },
@@ -318,40 +330,52 @@ export default function TextTranslationScreen({ navigation }: any) {
         { code: "dua", name: "Duala" },
         { code: "baf", name: "Bafut" },
         { code: "oro", name: "Oroko" },
-      ]
-    }
+      ],
+    },
   ];
 
-  const allLanguages = languageCategories.flatMap(category => category.languages);
+  const allLanguages = languageCategories.flatMap(
+    (category) => category.languages,
+  );
 
   const getFilteredLanguages = () => {
     if (!searchQuery.trim()) {
       return languageCategories;
     }
-    
+
     const query = searchQuery.toLowerCase().trim();
-    const filteredCategories = languageCategories.map(category => ({
-      ...category,
-      languages: category.languages.filter(lang => 
-        lang.name.toLowerCase().includes(query) || 
-        lang.code.toLowerCase().includes(query)
-      )
-    })).filter(category => category.languages.length > 0);
-    
+    const filteredCategories = languageCategories
+      .map((category) => ({
+        ...category,
+        languages: category.languages.filter(
+          (lang) =>
+            lang.name.toLowerCase().includes(query) ||
+            lang.code.toLowerCase().includes(query),
+        ),
+      }))
+      .filter((category) => category.languages.length > 0);
+
     return filteredCategories;
   };
 
   const normalizeText = (text: string): string => {
-    return text.toLowerCase().trim().replace(/[.,?!]/g, '');
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[.,?!]/g, "");
   };
 
-  const translatePhrase = (text: string, translations: { [key: string]: string }, isReverse: boolean = false): string | null => {
+  const translatePhrase = (
+    text: string,
+    translations: { [key: string]: string },
+    isReverse: boolean = false,
+  ): string | null => {
     const normalizedInput = normalizeText(text);
-    
+
     if (!isReverse && translations[normalizedInput]) {
       return translations[normalizedInput];
     }
-    
+
     if (isReverse) {
       for (const [english, dialect] of Object.entries(translations)) {
         if (normalizeText(dialect as string) === normalizedInput) {
@@ -360,14 +384,14 @@ export default function TextTranslationScreen({ navigation }: any) {
       }
     }
 
-    if (normalizedInput.includes(' ')) {
-      const words = normalizedInput.split(' ');
+    if (normalizedInput.includes(" ")) {
+      const words = normalizedInput.split(" ");
       let translatedWords: string[] = [];
       let someWordsTranslated = false;
 
       for (const word of words) {
         let translated = false;
-        
+
         if (!isReverse) {
           for (const [english, dialect] of Object.entries(translations)) {
             if (normalizeText(english) === word) {
@@ -387,63 +411,79 @@ export default function TextTranslationScreen({ navigation }: any) {
             }
           }
         }
-        
+
         if (!translated) {
           translatedWords.push(word);
         }
       }
 
       if (someWordsTranslated) {
-        return translatedWords.join(' ');
+        return translatedWords.join(" ");
       }
     }
 
     return null;
   };
 
-  const translateDialectToInternational = async (text: string, sourceDialect: string, targetInternational: string): Promise<string> => {
-    console.log(`🌍 Translating ${sourceDialect} → ${targetInternational} via English bridge`);
-    
+  const translateDialectToInternational = async (
+    text: string,
+    sourceDialect: string,
+    targetInternational: string,
+  ): Promise<string> => {
+    console.log(
+      `🌍 Translating ${sourceDialect} → ${targetInternational} via English bridge`,
+    );
+
     const sourceDict = dictionaries[sourceDialect];
     if (!sourceDict?.translations) {
       return `[${sourceDict?.targetLanguage || sourceDialect} dictionary not loaded]`;
     }
-    
-    let englishText = '';
+
+    let englishText = "";
     const normalizedInput = normalizeText(text);
-    
+
     for (const [english, dialect] of Object.entries(sourceDict.translations)) {
       if (normalizeText(dialect as string) === normalizedInput) {
         englishText = english;
         break;
       }
     }
-    
+
     if (!englishText) {
-      for (const [english, dialect] of Object.entries(sourceDict.translations)) {
+      for (const [english, dialect] of Object.entries(
+        sourceDict.translations,
+      )) {
         if (normalizeText(dialect as string) === normalizedInput) {
           englishText = english;
           break;
         }
       }
     }
-    
+
     if (!englishText) {
       const phraseResult = translatePhrase(text, sourceDict.translations, true);
       if (phraseResult) {
         englishText = phraseResult;
       }
     }
-    
+
     if (!englishText) {
       return `[Cannot translate from ${sourceDict.targetLanguage} to English]`;
     }
-    
-    console.log(`✅ ${sourceDict.targetLanguage} → English: "${text}" → "${englishText}"`);
-    
+
+    console.log(
+      `✅ ${sourceDict.targetLanguage} → English: "${text}" → "${englishText}"`,
+    );
+
     try {
-      const internationalText = await translateText(englishText, 'en', targetInternational);
-      console.log(`✅ English → ${targetInternational}: "${englishText}" → "${internationalText}"`);
+      const internationalText = await translateText(
+        englishText,
+        "en",
+        targetInternational,
+      );
+      console.log(
+        `✅ English → ${targetInternational}: "${englishText}" → "${internationalText}"`,
+      );
       return internationalText;
     } catch (err) {
       console.error("Azure Translation failed:", err);
@@ -451,176 +491,230 @@ export default function TextTranslationScreen({ navigation }: any) {
     }
   };
 
-  const translateInternationalToDialect = async (text: string, sourceInternational: string, targetDialect: string): Promise<string> => {
-    console.log(`🌍 Translating ${sourceInternational} → ${targetDialect} via English bridge`);
-    
-    let englishText = '';
+  const translateInternationalToDialect = async (
+    text: string,
+    sourceInternational: string,
+    targetDialect: string,
+  ): Promise<string> => {
+    console.log(
+      `🌍 Translating ${sourceInternational} → ${targetDialect} via English bridge`,
+    );
+
+    let englishText = "";
     try {
-      englishText = await translateText(text, sourceInternational, 'en');
-      console.log(`✅ ${sourceInternational} → English: "${text}" → "${englishText}"`);
+      englishText = await translateText(text, sourceInternational, "en");
+      console.log(
+        `✅ ${sourceInternational} → English: "${text}" → "${englishText}"`,
+      );
     } catch (err) {
       console.error("Azure Translation failed:", err);
       return `[Azure Translation Error from ${sourceInternational}]`;
     }
-    
+
     const targetDict = dictionaries[targetDialect];
     if (!targetDict?.translations) {
       return `[${targetDict?.targetLanguage || targetDialect} dictionary not loaded]`;
     }
-    
+
     const normalizedEnglish = normalizeText(englishText);
-    
+
     if (targetDict.translations[normalizedEnglish]) {
       const finalResult = targetDict.translations[normalizedEnglish] as string;
-      console.log(`✅ English → ${targetDict.targetLanguage}: "${englishText}" → "${finalResult}"`);
+      console.log(
+        `✅ English → ${targetDict.targetLanguage}: "${englishText}" → "${finalResult}"`,
+      );
       return finalResult;
     }
-    
+
     for (const [english, dialect] of Object.entries(targetDict.translations)) {
       if (normalizeText(english) === normalizedEnglish) {
-        console.log(`✅ English → ${targetDict.targetLanguage}: "${englishText}" → "${dialect}"`);
+        console.log(
+          `✅ English → ${targetDict.targetLanguage}: "${englishText}" → "${dialect}"`,
+        );
         return dialect as string;
       }
     }
-    
-    const phraseResult = translatePhrase(englishText, targetDict.translations, false);
+
+    const phraseResult = translatePhrase(
+      englishText,
+      targetDict.translations,
+      false,
+    );
     if (phraseResult) {
-      console.log(`✅ English → ${targetDict.targetLanguage} phrase: "${englishText}" → "${phraseResult}"`);
+      console.log(
+        `✅ English → ${targetDict.targetLanguage} phrase: "${englishText}" → "${phraseResult}"`,
+      );
       return phraseResult;
     }
-    
+
     return `[Cannot translate from English to ${targetDict.targetLanguage}]`;
   };
 
   const translateWithDictionary = async (
     text: string,
     sourceLang: string,
-    targetLang: string
+    targetLang: string,
   ): Promise<string> => {
-    if (!text.trim()) return '';
-    
-    if (sourceLang === 'en' && isCameroonianDialect(targetLang)) {
+    if (!text.trim()) return "";
+
+    if (sourceLang === "en" && isCameroonianDialect(targetLang)) {
       const dictionary = dictionaries[targetLang];
       if (!dictionary?.translations) {
         return `[${dictionary?.targetLanguage || targetLang} dictionary not loaded]`;
       }
-      
+
       const normalizedInput = normalizeText(text);
       if (dictionary.translations[normalizedInput]) {
         return dictionary.translations[normalizedInput] as string;
       }
-      
-      for (const [english, dialect] of Object.entries(dictionary.translations)) {
+
+      for (const [english, dialect] of Object.entries(
+        dictionary.translations,
+      )) {
         if (normalizeText(english) === normalizedInput) {
           return dialect as string;
         }
       }
-      
-      const phraseResult = translatePhrase(text, dictionary.translations, false);
+
+      const phraseResult = translatePhrase(
+        text,
+        dictionary.translations,
+        false,
+      );
       if (phraseResult) {
         return phraseResult;
       }
-      
+
       return `[No ${dictionary.targetLanguage} translation for "${text}"]`;
     }
-    
-    if (isCameroonianDialect(sourceLang) && targetLang === 'en') {
+
+    if (isCameroonianDialect(sourceLang) && targetLang === "en") {
       const dictionary = dictionaries[sourceLang];
       if (!dictionary?.translations) {
         return `[${dictionary?.targetLanguage || sourceLang} dictionary not loaded]`;
       }
-      
+
       const normalizedInput = normalizeText(text);
-      
-      for (const [english, dialect] of Object.entries(dictionary.translations)) {
+
+      for (const [english, dialect] of Object.entries(
+        dictionary.translations,
+      )) {
         if (normalizeText(dialect as string) === normalizedInput) {
           return english;
         }
       }
-      
-      for (const [english, dialect] of Object.entries(dictionary.translations)) {
+
+      for (const [english, dialect] of Object.entries(
+        dictionary.translations,
+      )) {
         if (normalizeText(dialect as string) === normalizedInput) {
           return english;
         }
       }
-      
+
       const phraseResult = translatePhrase(text, dictionary.translations, true);
       if (phraseResult) {
         return phraseResult;
       }
-      
+
       return `[No English translation for "${text}" in ${dictionary.targetLanguage}]`;
     }
-    
+
     if (isCameroonianDialect(sourceLang) && isCameroonianDialect(targetLang)) {
-      console.log(`🎯 Translating ${sourceLang} → ${targetLang} via English bridge`);
-      
+      console.log(
+        `🎯 Translating ${sourceLang} → ${targetLang} via English bridge`,
+      );
+
       const sourceDict = dictionaries[sourceLang];
       const targetDict = dictionaries[targetLang];
-      
+
       if (!sourceDict?.translations) {
         return `[${sourceDict?.targetLanguage || sourceLang} dictionary not loaded]`;
       }
       if (!targetDict?.translations) {
         return `[${targetDict?.targetLanguage || targetLang} dictionary not loaded]`;
       }
-      
-      let englishText = '';
+
+      let englishText = "";
       const normalizedInput = normalizeText(text);
-      
-      for (const [english, dialect] of Object.entries(sourceDict.translations)) {
+
+      for (const [english, dialect] of Object.entries(
+        sourceDict.translations,
+      )) {
         if (normalizeText(dialect as string) === normalizedInput) {
           englishText = english;
           break;
         }
       }
-      
+
       if (!englishText) {
-        for (const [english, dialect] of Object.entries(sourceDict.translations)) {
+        for (const [english, dialect] of Object.entries(
+          sourceDict.translations,
+        )) {
           if (normalizeText(dialect as string) === normalizedInput) {
             englishText = english;
             break;
           }
         }
       }
-      
+
       if (!englishText) {
-        const phraseResult = translatePhrase(text, sourceDict.translations, true);
+        const phraseResult = translatePhrase(
+          text,
+          sourceDict.translations,
+          true,
+        );
         if (phraseResult) {
           englishText = phraseResult;
         }
       }
-      
+
       if (!englishText) {
         return `[Cannot translate from ${sourceDict.targetLanguage} to English]`;
       }
-      
-      console.log(`✅ ${sourceDict.targetLanguage} → English: "${text}" → "${englishText}"`);
-      
+
+      console.log(
+        `✅ ${sourceDict.targetLanguage} → English: "${text}" → "${englishText}"`,
+      );
+
       const normalizedEnglish = normalizeText(englishText);
-      
+
       if (targetDict.translations[normalizedEnglish]) {
-        const finalResult = targetDict.translations[normalizedEnglish] as string;
-        console.log(`✅ English → ${targetDict.targetLanguage}: "${englishText}" → "${finalResult}"`);
+        const finalResult = targetDict.translations[
+          normalizedEnglish
+        ] as string;
+        console.log(
+          `✅ English → ${targetDict.targetLanguage}: "${englishText}" → "${finalResult}"`,
+        );
         return finalResult;
       }
-      
-      for (const [english, dialect] of Object.entries(targetDict.translations)) {
+
+      for (const [english, dialect] of Object.entries(
+        targetDict.translations,
+      )) {
         if (normalizeText(english) === normalizedEnglish) {
-          console.log(`✅ English → ${targetDict.targetLanguage}: "${englishText}" → "${dialect}"`);
+          console.log(
+            `✅ English → ${targetDict.targetLanguage}: "${englishText}" → "${dialect}"`,
+          );
           return dialect as string;
         }
       }
-      
-      const phraseResult = translatePhrase(englishText, targetDict.translations, false);
+
+      const phraseResult = translatePhrase(
+        englishText,
+        targetDict.translations,
+        false,
+      );
       if (phraseResult) {
-        console.log(`✅ English → ${targetDict.targetLanguage} phrase: "${englishText}" → "${phraseResult}"`);
+        console.log(
+          `✅ English → ${targetDict.targetLanguage} phrase: "${englishText}" → "${phraseResult}"`,
+        );
         return phraseResult;
       }
-      
+
       return `[Cannot translate from English to ${targetDict.targetLanguage}]`;
     }
-    
+
     return `[Unsupported translation: ${sourceLang} to ${targetLang}]`;
   };
 
@@ -633,7 +727,7 @@ export default function TextTranslationScreen({ navigation }: any) {
       const translateTimer = setTimeout(() => {
         handleTranslate();
       }, 1000);
-      
+
       return () => clearTimeout(translateTimer);
     } else {
       setOutput("");
@@ -642,17 +736,24 @@ export default function TextTranslationScreen({ navigation }: any) {
 
   const swapLanguages = () => {
     if (sourceLang === "auto") {
-      Alert.alert("Cannot Swap", "Cannot swap when source is set to auto-detect.");
+      Alert.alert(
+        "Cannot Swap",
+        "Cannot swap when source is set to auto-detect.",
+      );
       return;
     }
-    
+
     const prevSource = sourceLang;
     const prevTarget = targetLang;
-    
+
     setSourceLang(prevTarget);
     setTargetLang(prevSource);
-    
-    if (output && output !== "[Azure Translation Error]" && !output.includes("[Dictionary")) {
+
+    if (
+      output &&
+      output !== "[Azure Translation Error]" &&
+      !output.includes("[Dictionary")
+    ) {
       setInput(output);
       setOutput(input);
     }
@@ -660,52 +761,57 @@ export default function TextTranslationScreen({ navigation }: any) {
 
   const handleUpgrade = async () => {
     closeModal();
-    Alert.alert(
-      "Upgrade to Premium",
-      "Choose your premium plan:",
-      [
-        {
-          text: "1 Month - $9.99",
-          onPress: async () => {
-            const success = await upgradeToPremium('monthly');
-            if (success) {
-              Alert.alert("Success", "You've been upgraded to Premium for 30 days!");
-              await loadLimitStatus();
-            } else {
-              Alert.alert("Error", "Failed to upgrade. Please try again.");
-            }
+    Alert.alert("Upgrade to Premium", "Choose your premium plan:", [
+      {
+        text: "1 Month - $9.99",
+        onPress: async () => {
+          const success = await upgradeToPremium("monthly");
+          if (success) {
+            Alert.alert(
+              "Success",
+              "You've been upgraded to Premium for 30 days!",
+            );
+            await loadLimitStatus();
+          } else {
+            Alert.alert("Error", "Failed to upgrade. Please try again.");
           }
         },
-        {
-          text: "6 Months - $49.99",
-          onPress: async () => {
-            const success = await upgradeToPremium('6months');
-            if (success) {
-              Alert.alert("Success", "You've been upgraded to Premium for 180 days!");
-              await loadLimitStatus();
-            } else {
-              Alert.alert("Error", "Failed to upgrade. Please try again.");
-            }
+      },
+      {
+        text: "6 Months - $49.99",
+        onPress: async () => {
+          const success = await upgradeToPremium("6months");
+          if (success) {
+            Alert.alert(
+              "Success",
+              "You've been upgraded to Premium for 180 days!",
+            );
+            await loadLimitStatus();
+          } else {
+            Alert.alert("Error", "Failed to upgrade. Please try again.");
           }
         },
-        {
-          text: "1 Year - $89.99",
-          onPress: async () => {
-            const success = await upgradeToPremium('yearly');
-            if (success) {
-              Alert.alert("Success", "You've been upgraded to Premium for 360 days!");
-              await loadLimitStatus();
-            } else {
-              Alert.alert("Error", "Failed to upgrade. Please try again.");
-            }
+      },
+      {
+        text: "1 Year - $89.99",
+        onPress: async () => {
+          const success = await upgradeToPremium("yearly");
+          if (success) {
+            Alert.alert(
+              "Success",
+              "You've been upgraded to Premium for 360 days!",
+            );
+            await loadLimitStatus();
+          } else {
+            Alert.alert("Error", "Failed to upgrade. Please try again.");
           }
         },
-        {
-          text: "Cancel",
-          style: "cancel"
-        }
-      ]
-    );
+      },
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+    ]);
   };
 
   const handleTranslate = async () => {
@@ -715,26 +821,30 @@ export default function TextTranslationScreen({ navigation }: any) {
     }
 
     const { allowed, result } = await checkAndUpdateWordCount(input);
-    
+
     if (!allowed) {
-      console.log('Translation blocked due to word limit');
+      console.log("Translation blocked due to word limit");
       return;
     }
 
     const isCameroonianSource = isCameroonianDialect(sourceLang);
     const isCameroonianTarget = isCameroonianDialect(targetLang);
 
-    if (isCameroonianSource && !isCameroonianTarget && targetLang !== 'en') {
+    if (isCameroonianSource && !isCameroonianTarget && targetLang !== "en") {
       setIsLoading(true);
       try {
-        const translatedText = await translateDialectToInternational(input, sourceLang, targetLang);
+        const translatedText = await translateDialectToInternational(
+          input,
+          sourceLang,
+          targetLang,
+        );
         setOutput(translatedText);
-        if (translatedText && !translatedText.includes('[')) {
+        if (translatedText && !translatedText.includes("[")) {
           await saveTranslation({
             source_text: input,
             translated_text: translatedText,
             source_language: sourceLang,
-            target_language: targetLang
+            target_language: targetLang,
           });
         }
       } catch (err) {
@@ -746,17 +856,21 @@ export default function TextTranslationScreen({ navigation }: any) {
       return;
     }
 
-    if (!isCameroonianSource && sourceLang !== 'en' && isCameroonianTarget) {
+    if (!isCameroonianSource && sourceLang !== "en" && isCameroonianTarget) {
       setIsLoading(true);
       try {
-        const translatedText = await translateInternationalToDialect(input, sourceLang, targetLang);
+        const translatedText = await translateInternationalToDialect(
+          input,
+          sourceLang,
+          targetLang,
+        );
         setOutput(translatedText);
-        if (translatedText && !translatedText.includes('[')) {
+        if (translatedText && !translatedText.includes("[")) {
           await saveTranslation({
             source_text: input,
             translated_text: translatedText,
             source_language: sourceLang,
-            target_language: targetLang
+            target_language: targetLang,
           });
         }
       } catch (err) {
@@ -768,19 +882,29 @@ export default function TextTranslationScreen({ navigation }: any) {
       return;
     }
 
-    if ((isCameroonianSource && targetLang === 'en') || 
-        (sourceLang === 'en' && isCameroonianTarget) ||
-        (isCameroonianSource && isCameroonianTarget)) {
+    if (
+      (isCameroonianSource && targetLang === "en") ||
+      (sourceLang === "en" && isCameroonianTarget) ||
+      (isCameroonianSource && isCameroonianTarget)
+    ) {
       setIsLoading(true);
       try {
-        const translatedText = await translateWithDictionary(input, sourceLang, targetLang);
+        const translatedText = await translateWithDictionary(
+          input,
+          sourceLang,
+          targetLang,
+        );
         setOutput(translatedText);
-        if (translatedText && !translatedText.includes('[') && !translatedText.includes('No ')) {
+        if (
+          translatedText &&
+          !translatedText.includes("[") &&
+          !translatedText.includes("No ")
+        ) {
           await saveTranslation({
             source_text: input,
             translated_text: translatedText,
             source_language: sourceLang,
-            target_language: targetLang
+            target_language: targetLang,
           });
         }
       } catch (err) {
@@ -801,7 +925,7 @@ export default function TextTranslationScreen({ navigation }: any) {
           source_text: input,
           translated_text: translatedText,
           source_language: sourceLang,
-          target_language: targetLang
+          target_language: targetLang,
         });
       }
     } catch (err) {
@@ -814,11 +938,16 @@ export default function TextTranslationScreen({ navigation }: any) {
 
   // 🟢 UPDATED: COPY OUTPUT FUNCTION - Actually copies to clipboard
   const copyOutput = async () => {
-    if (!output || output.includes("[Error]") || output.includes("[Dictionary") || output.includes("[No translation")) {
+    if (
+      !output ||
+      output.includes("[Error]") ||
+      output.includes("[Dictionary") ||
+      output.includes("[No translation")
+    ) {
       Alert.alert("No Text", "There is no text to copy.");
       return;
     }
-    
+
     try {
       await Clipboard.setString(output);
       Alert.alert("Copied", "Text copied to clipboard");
@@ -830,7 +959,12 @@ export default function TextTranslationScreen({ navigation }: any) {
 
   // 🟢 ADDED: SHARE OUTPUT FUNCTION
   const shareOutput = async () => {
-    if (!output || output.includes("[Error]") || output.includes("[Dictionary") || output.includes("[No translation")) {
+    if (
+      !output ||
+      output.includes("[Error]") ||
+      output.includes("[Dictionary") ||
+      output.includes("[No translation")
+    ) {
       Alert.alert("No Text", "There is no translated text to share.");
       return;
     }
@@ -838,15 +972,16 @@ export default function TextTranslationScreen({ navigation }: any) {
     try {
       const sourceLangName = getLanguageName(sourceLang);
       const targetLangName = getLanguageName(targetLang);
-      
-      const shareMessage = `🌐 Translation Result\n\n` +
-                          `From ${sourceLangName} (${sourceLang}):\n${input}\n\n` +
-                          `To ${targetLangName} (${targetLang}):\n${output}\n\n` +
-                          `Translated via Language Translator App`;
-      
+
+      const shareMessage =
+        `🌐 Translation Result\n\n` +
+        `From ${sourceLangName} (${sourceLang}):\n${input}\n\n` +
+        `To ${targetLangName} (${targetLang}):\n${output}\n\n` +
+        `Translated via Language Translator App`;
+
       await Share.share({
         message: shareMessage,
-        title: 'Share Translation',
+        title: "Share Translation",
       });
     } catch (error) {
       console.error("Sharing failed:", error);
@@ -855,7 +990,12 @@ export default function TextTranslationScreen({ navigation }: any) {
   };
 
   const speakOutput = async () => {
-    if (!output || output.includes("[Error]") || output.includes("[Dictionary") || output.includes("[No translation")) {
+    if (
+      !output ||
+      output.includes("[Error]") ||
+      output.includes("[Dictionary") ||
+      output.includes("[No translation")
+    ) {
       Alert.alert("No Text", "There is no translated text to speak.");
       return;
     }
@@ -868,13 +1008,16 @@ export default function TextTranslationScreen({ navigation }: any) {
       }
 
       setIsSpeaking(true);
-      
+
       const languageMap: { [key: string]: string } = {
-        'en': 'en-US', 'es': 'es-ES', 'fr': 'fr-FR', 'de': 'de-DE',
+        en: "en-US",
+        es: "es-ES",
+        fr: "fr-FR",
+        de: "de-DE",
       };
 
-      const speechLanguage = languageMap[targetLang] || 'en-US';
-      
+      const speechLanguage = languageMap[targetLang] || "en-US";
+
       await Speech.speak(output, {
         language: speechLanguage,
         pitch: 1.0,
@@ -885,7 +1028,6 @@ export default function TextTranslationScreen({ navigation }: any) {
           setIsSpeaking(false);
         },
       });
-
     } catch (error) {
       Alert.alert("Speech Error", "Text-to-speech is not available.");
       setIsSpeaking(false);
@@ -899,13 +1041,15 @@ export default function TextTranslationScreen({ navigation }: any) {
   }, []);
 
   const getLanguageName = (code: string) => {
-    return allLanguages.find(lang => lang.code === code)?.name || code;
+    return allLanguages.find((lang) => lang.code === code)?.name || code;
   };
 
   const LanguageSelectorModal = () => {
     const filteredCategories = getFilteredLanguages();
-    const totalFilteredLanguages = filteredCategories.flatMap(cat => cat.languages).length;
-    
+    const totalFilteredLanguages = filteredCategories.flatMap(
+      (cat) => cat.languages,
+    ).length;
+
     return (
       <Modal
         visible={showLangModal}
@@ -919,11 +1063,18 @@ export default function TextTranslationScreen({ navigation }: any) {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {isSelectingSource ? "Select Source Language" : "Select Target Language"}
+              {isSelectingSource
+                ? "Select Source Language"
+                : "Select Target Language"}
             </Text>
-            
+
             <View style={styles.searchContainer}>
-              <Ionicons name="search" size={20} color={COLORS.gold} style={styles.searchIcon} />
+              <Ionicons
+                name="search"
+                size={20}
+                color={COLORS.gold}
+                style={styles.searchIcon}
+              />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search languages..."
@@ -934,7 +1085,7 @@ export default function TextTranslationScreen({ navigation }: any) {
                 autoCorrect={false}
               />
               {searchQuery.length > 0 && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.clearButton}
                   onPress={() => setSearchQuery("")}
                 >
@@ -942,13 +1093,14 @@ export default function TextTranslationScreen({ navigation }: any) {
                 </TouchableOpacity>
               )}
             </View>
-            
+
             {searchQuery.trim() && (
               <Text style={styles.searchResultsText}>
-                Found {totalFilteredLanguages} language{totalFilteredLanguages !== 1 ? 's' : ''} for "{searchQuery}"
+                Found {totalFilteredLanguages} language
+                {totalFilteredLanguages !== 1 ? "s" : ""} for "{searchQuery}"
               </Text>
             )}
-            
+
             <FlatList
               data={filteredCategories}
               keyExtractor={(item) => item.name}
@@ -960,8 +1112,10 @@ export default function TextTranslationScreen({ navigation }: any) {
                       key={lang.code}
                       style={[
                         styles.langItem,
-                        (isSelectingSource ? sourceLang : targetLang) === lang.code && styles.selectedLangItem,
-                        isCameroonianDialect(lang.code) && styles.cameroonLangItem
+                        (isSelectingSource ? sourceLang : targetLang) ===
+                          lang.code && styles.selectedLangItem,
+                        isCameroonianDialect(lang.code) &&
+                          styles.cameroonLangItem,
                       ]}
                       onPress={() => {
                         if (isSelectingSource) setSourceLang(lang.code);
@@ -970,10 +1124,13 @@ export default function TextTranslationScreen({ navigation }: any) {
                         setSearchQuery("");
                       }}
                     >
-                      <Text style={[
-                        styles.langText,
-                        isCameroonianDialect(lang.code) && styles.cameroonLangText
-                      ]}>
+                      <Text
+                        style={[
+                          styles.langText,
+                          isCameroonianDialect(lang.code) &&
+                            styles.cameroonLangText,
+                        ]}
+                      >
                         {lang.name} {isCameroonianDialect(lang.code) && "🇨🇲"}
                       </Text>
                     </TouchableOpacity>
@@ -982,7 +1139,11 @@ export default function TextTranslationScreen({ navigation }: any) {
               )}
               ListEmptyComponent={
                 <View style={styles.emptySearchContainer}>
-                  <Ionicons name="search-outline" size={40} color={COLORS.gold} />
+                  <Ionicons
+                    name="search-outline"
+                    size={40}
+                    color={COLORS.gold}
+                  />
                   <Text style={styles.emptySearchText}>No languages found</Text>
                   <Text style={styles.emptySearchSubtext}>
                     Try searching with different terms
@@ -990,7 +1151,7 @@ export default function TextTranslationScreen({ navigation }: any) {
                 </View>
               }
             />
-            
+
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => {
@@ -1008,7 +1169,10 @@ export default function TextTranslationScreen({ navigation }: any) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
         <Ionicons name="arrow-back" size={28} color={COLORS.gold} />
       </TouchableOpacity>
 
@@ -1016,9 +1180,7 @@ export default function TextTranslationScreen({ navigation }: any) {
 
       <View style={styles.supportIndicator}>
         <Ionicons name="globe-outline" size={16} color={COLORS.forestGreen} />
-        <Text style={styles.supportText}>
-          150+ languages supported
-        </Text>
+        <Text style={styles.supportText}>150+ languages supported</Text>
       </View>
 
       <View style={styles.debugInfo}>
@@ -1079,8 +1241,8 @@ export default function TextTranslationScreen({ navigation }: any) {
         <TextInput
           style={styles.textInput}
           placeholder={
-            isCameroonianDialect(sourceLang) || isCameroonianDialect(targetLang) 
-              ? "Type words, phrases or sentences to translate..." 
+            isCameroonianDialect(sourceLang) || isCameroonianDialect(targetLang)
+              ? "Type words, phrases or sentences to translate..."
               : "Type here to translate with Azure..."
           }
           placeholderTextColor={COLORS.forestGreen}
@@ -1088,23 +1250,25 @@ export default function TextTranslationScreen({ navigation }: any) {
           onChangeText={setInput}
           multiline
         />
-        {isLoading && <ActivityIndicator color={COLORS.gold} style={styles.loader} />}
+        {isLoading && (
+          <ActivityIndicator color={COLORS.gold} style={styles.loader} />
+        )}
       </View>
 
       <View style={styles.outputContainer}>
         <Text style={styles.outputText}>
-          {output || (
-            isCameroonianDialect(sourceLang) || isCameroonianDialect(targetLang)
+          {output ||
+            (isCameroonianDialect(sourceLang) ||
+            isCameroonianDialect(targetLang)
               ? "Cameroonian translation will appear here..."
-              : "Translation will appear here..."
-          )}
+              : "Translation will appear here...")}
         </Text>
         <View style={styles.actionsContainer}>
           <TouchableOpacity onPress={speakOutput} style={styles.speakerButton}>
-            <Ionicons 
-              name={isSpeaking ? "stop-circle" : "volume-high"} 
-              size={28} 
-              color={isSpeaking ? COLORS.forestGreen : COLORS.gold} 
+            <Ionicons
+              name={isSpeaking ? "stop-circle" : "volume-high"}
+              size={28}
+              color={isSpeaking ? COLORS.forestGreen : COLORS.gold}
             />
           </TouchableOpacity>
           <TouchableOpacity onPress={copyOutput} style={styles.actionButton}>
@@ -1118,12 +1282,10 @@ export default function TextTranslationScreen({ navigation }: any) {
 
       <View style={styles.testInfo}>
         <Text style={styles.testInfoText}>
-          • 150+ International languages{"\n"}
-          • English ↔ Dialects: Words, phrases & sentences{"\n"}
-          • Dialect ↔ Dialect: eg (Bakweri↔Bakossi){"\n"}
-          • Dialect ↔ International: eg (Bakweri↔French){"\n"}
-          • Partial translations for unknown words{"\n"}
-          • Share translations with others
+          • 150+ International languages{"\n"}• English ↔ Dialects: Words,
+          phrases & sentences{"\n"}• Dialect ↔ Dialect: eg (Bakweri↔Bakossi)
+          {"\n"}• Dialect ↔ International: eg (Bakweri↔French){"\n"}• Partial
+          translations for unknown words{"\n"}• Share translations with others
         </Text>
       </View>
     </ScrollView>
@@ -1131,22 +1293,22 @@ export default function TextTranslationScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flexGrow: 1, 
-    backgroundColor: COLORS.black, 
+  container: {
+    flexGrow: 1,
+    backgroundColor: COLORS.black,
     padding: 16,
     paddingTop: 50,
   },
-  backButton: { 
+  backButton: {
     marginBottom: 20,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
-  title: { 
-    fontSize: 24, 
-    fontWeight: "bold", 
-    color: COLORS.gold, 
-    marginBottom: 10, 
-    textAlign: "center" 
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: COLORS.gold,
+    marginBottom: 10,
+    textAlign: "center",
   },
   supportIndicator: {
     flexDirection: "row",
@@ -1161,11 +1323,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(46, 139, 87, 0.3)",
     alignSelf: "center",
   },
-  supportText: { 
-    color: COLORS.forestGreen, 
-    fontSize: 14, 
-    fontWeight: "500", 
-    marginLeft: 8 
+  supportText: {
+    color: COLORS.forestGreen,
+    fontSize: 14,
+    fontWeight: "500",
+    marginLeft: 8,
   },
   debugInfo: {
     flexDirection: "row",
@@ -1183,43 +1345,43 @@ const styles = StyleSheet.create({
   debugInfoText: {
     color: COLORS.gold,
     fontSize: 12,
-    textAlign: 'center',
+    textAlign: "center",
   },
-  languageContainer: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    justifyContent: "space-between", 
-    marginBottom: 20 
+  languageContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
-  pickerWrapper: { 
-    flex: 1, 
-    marginHorizontal: 5 
+  pickerWrapper: {
+    flex: 1,
+    marginHorizontal: 5,
   },
-  label: { 
-    color: COLORS.forestGreen, 
-    marginBottom: 8, 
+  label: {
+    color: COLORS.forestGreen,
+    marginBottom: 8,
     fontWeight: "bold",
     fontSize: 14,
   },
-  customPicker: { 
-    backgroundColor: COLORS.black, 
-    borderWidth: 1, 
-    borderColor: COLORS.gold, 
-    borderRadius: 8, 
-    padding: 12, 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    alignItems: "center" 
+  customPicker: {
+    backgroundColor: COLORS.black,
+    borderWidth: 1,
+    borderColor: COLORS.gold,
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  pickerText: { 
-    color: COLORS.gold, 
+  pickerText: {
+    color: COLORS.gold,
     fontWeight: "600",
     fontSize: 14,
   },
-  swapButton: { 
+  swapButton: {
     paddingHorizontal: 10,
     paddingVertical: 8,
-    alignItems: "center", 
+    alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(212, 175, 55, 0.1)",
     borderRadius: 8,
@@ -1228,27 +1390,27 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     marginTop: 15,
   },
-  modalContainer: { 
-    flex: 1, 
-    backgroundColor: "rgba(0,0,0,0.8)", 
-    justifyContent: "center", 
-    alignItems: "center" 
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  modalContent: { 
-    backgroundColor: COLORS.black, 
-    borderRadius: 12, 
-    padding: 20, 
-    width: "90%", 
-    maxHeight: "85%", 
-    borderWidth: 2, 
-    borderColor: COLORS.gold 
+  modalContent: {
+    backgroundColor: COLORS.black,
+    borderRadius: 12,
+    padding: 20,
+    width: "90%",
+    maxHeight: "85%",
+    borderWidth: 2,
+    borderColor: COLORS.gold,
   },
-  modalTitle: { 
-    color: COLORS.gold, 
-    fontSize: 18, 
-    fontWeight: "bold", 
-    marginBottom: 15, 
-    textAlign: "center" 
+  modalTitle: {
+    color: COLORS.gold,
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: "center",
   },
   searchContainer: {
     flexDirection: "row",
@@ -1308,19 +1470,19 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: COLORS.gold,
   },
-  langItem: { 
-    paddingVertical: 12, 
+  langItem: {
+    paddingVertical: 12,
     paddingHorizontal: 15,
-    borderBottomColor: "rgba(212, 175, 55, 0.2)", 
-    borderBottomWidth: 1 
+    borderBottomColor: "rgba(212, 175, 55, 0.2)",
+    borderBottomWidth: 1,
   },
   selectedLangItem: {
     backgroundColor: "rgba(212, 175, 55, 0.1)",
     borderLeftWidth: 3,
     borderLeftColor: COLORS.gold,
   },
-  langText: { 
-    color: COLORS.gold, 
+  langText: {
+    color: COLORS.gold,
     fontSize: 16,
   },
   cameroonLangItem: {
@@ -1329,51 +1491,51 @@ const styles = StyleSheet.create({
   cameroonLangText: {
     fontWeight: "600",
   },
-  modalCloseButton: { 
-    backgroundColor: COLORS.gold, 
-    borderRadius: 20, 
-    paddingVertical: 12, 
-    marginTop: 10 
+  modalCloseButton: {
+    backgroundColor: COLORS.gold,
+    borderRadius: 20,
+    paddingVertical: 12,
+    marginTop: 10,
   },
-  modalCloseText: { 
-    color: COLORS.black, 
-    fontWeight: "bold", 
+  modalCloseText: {
+    color: COLORS.black,
+    fontWeight: "bold",
     textAlign: "center",
     fontSize: 16,
   },
-  inputContainer: { 
-    backgroundColor: COLORS.black, 
-    borderRadius: 10, 
-    borderWidth: 1, 
-    borderColor: COLORS.gold, 
-    padding: 15, 
-    marginBottom: 15 
+  inputContainer: {
+    backgroundColor: COLORS.black,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.gold,
+    padding: 15,
+    marginBottom: 15,
   },
-  textInput: { 
-    color: COLORS.gold, 
-    fontSize: 16, 
+  textInput: {
+    color: COLORS.gold,
+    fontSize: 16,
     minHeight: 100,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
-  loader: { 
-    marginTop: 10 
+  loader: {
+    marginTop: 10,
   },
-  outputContainer: { 
-    backgroundColor: COLORS.black, 
-    borderRadius: 10, 
-    borderWidth: 1, 
-    borderColor: COLORS.gold, 
-    padding: 15, 
-    minHeight: 100, 
-    marginBottom: 15 
+  outputContainer: {
+    backgroundColor: COLORS.black,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.gold,
+    padding: 15,
+    minHeight: 100,
+    marginBottom: 15,
   },
-  outputText: { 
-    color: COLORS.gold, 
-    fontSize: 16, 
-    marginBottom: 10 
+  outputText: {
+    color: COLORS.gold,
+    fontSize: 16,
+    marginBottom: 10,
   },
-  actionsContainer: { 
-    flexDirection: "row", 
+  actionsContainer: {
+    flexDirection: "row",
     justifyContent: "flex-end",
     gap: 15,
   },
@@ -1389,6 +1551,6 @@ const styles = StyleSheet.create({
   testInfoText: {
     color: COLORS.gold,
     fontSize: 12,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

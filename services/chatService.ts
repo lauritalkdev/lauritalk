@@ -1,4 +1,4 @@
-/* services/chatService.ts (UPDATED - USING EDGE FUNCTION FOR TRANSLATION) */
+/* services/chatService.ts (UPDATED - OPTION 2: Duplicate Prevention Safety Layer) */
 import {
   ApiResponse,
   CHAT_CONSTANTS,
@@ -39,6 +39,9 @@ class ChatService {
   
   // Store active channels for cleanup
   private activeChannels: Map<string, any> = new Map();
+  
+  // OPTION 2: Duplicate prevention at service level
+  private recentMessageIds: Set<string> = new Set();
 
   constructor() {
     this.initializeTranslationService();
@@ -195,11 +198,12 @@ class ChatService {
   }
 
   /**
-   * Get language name from code
+   * Get language name from code - 60 HIGH-QUALITY Languages (OpenAI Well-Supported)
    */
   private getLanguageName(languageCode: string): string {
-    // Common language mapping - expand as needed
+    // 60 High-Quality Languages - OpenAI Well-Supported
     const languageMap: { [key: string]: string } = {
+      // Major World Languages (37)
       'en': 'English',
       'es': 'Spanish',
       'fr': 'French',
@@ -237,27 +241,39 @@ class ChatService {
       'yo': 'Yoruba',
       'ig': 'Igbo',
       'ha': 'Hausa',
-      // Cameroonian dialects
-      'bga': 'Bangwa',
-      'bkw': 'Bakweri',
-      'bak': 'Bakossi',
-      'byi': 'Bayangi',
-      'kom': 'Kom',
-      'nge': 'Ngemba',
-      'mgk': 'Mungaka',
-      'bam': 'Bamileke',
-      'dua': 'Duala',
-      'baf': 'Bafut',
-      'oro': 'Oroko',
+      // Well-Supported Additional Languages (23)
+      'bn': 'Bengali',
+      'ur': 'Urdu',
+      'fa': 'Persian',
+      'uk': 'Ukrainian',
+      'bg': 'Bulgarian',
+      'hr': 'Croatian',
+      'sr': 'Serbian',
+      'sk': 'Slovak',
+      'sl': 'Slovenian',
+      'lt': 'Lithuanian',
+      'lv': 'Latvian',
+      'et': 'Estonian',
+      'ca': 'Catalan',
+      'pa': 'Punjabi',
+      'ta': 'Tamil',
+      'te': 'Telugu',
+      'kn': 'Kannada',
+      'ml': 'Malayalam',
+      'mr': 'Marathi',
+      'gu': 'Gujarati',
+      'am': 'Amharic',
+      'so': 'Somali',
+      'hy': 'Armenian',
     };
     
     return languageMap[languageCode] || languageCode.toUpperCase();
   }
 
-  // ==================== REALTIME SUBSCRIPTIONS - FIXED VERSION ====================
+  // ==================== REALTIME SUBSCRIPTIONS - OPTION 2: WITH DUPLICATE PREVENTION ====================
   
   /**
-   * Subscribe to conversation messages with proper cleanup
+   * Subscribe to conversation messages with proper cleanup and duplicate prevention
    */
   subscribeToConversation(
     otherUserId: string,
@@ -327,7 +343,21 @@ class ChatService {
               (msg.sender_id === userId && msg.receiver_id === otherUserId);
             
             if (isRelevant) {
-              console.log(`📨 [REALTIME] Calling callback for relevant message ${msg.id}`);
+              // OPTION 2: Duplicate prevention at service level
+              if (this.recentMessageIds.has(msg.id)) {
+                console.log(`📨 [REALTIME] 🛡️ Duplicate message ${msg.id} detected - preventing duplicate callback`);
+                return;
+              }
+              
+              // Track message ID (keep last 100 to prevent memory bloat)
+              this.recentMessageIds.add(msg.id);
+              if (this.recentMessageIds.size > 100) {
+                // Remove oldest message ID
+                const firstId = this.recentMessageIds.values().next().value;
+                this.recentMessageIds.delete(firstId);
+              }
+              
+              console.log(`📨 [REALTIME] ✅ Calling callback for relevant message ${msg.id} (tracked: ${this.recentMessageIds.size} recent IDs)`);
               callback(msg);
             } else {
               console.log(`📨 [REALTIME] Message not relevant - ignoring`);
@@ -584,6 +614,11 @@ class ChatService {
     }
     
     this.activeChannels.clear();
+    
+    // OPTION 2: Clear recent message IDs on cleanup
+    console.log(`🧹 [CLEANUP] Clearing ${this.recentMessageIds.size} tracked message IDs`);
+    this.recentMessageIds.clear();
+    
     console.log('✅ [CLEANUP] All subscriptions cleaned up');
   }
 
