@@ -15,8 +15,7 @@ import {
   TextInput,
   TouchableOpacity,
   Vibration,
-  View,
-  Platform
+  View
 } from 'react-native';
 
 // ==================== REMOVED OPENAI API KEY ====================
@@ -336,40 +335,6 @@ const saveVoiceTranslationToHistory = async (
   } catch (error) {
     console.error('Error saving voice translation:', error);
   }
-};
-
-// 🟢 Helper function to convert URI to Blob (web compatible)
-const uriToBlob = (uri: string): Promise<Blob> => {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.onload = function() {
-      resolve(xhr.response);
-    };
-    xhr.onerror = function() {
-      reject(new Error('Failed to load audio file'));
-    };
-    xhr.responseType = 'blob';
-    xhr.open('GET', uri, true);
-    xhr.send(null);
-  });
-};
-
-// 🟢 Helper function to convert Blob to base64 (web compatible)
-const blobToBase64 = (blob: Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        // Remove data URL prefix if present
-        const base64 = reader.result.split(',')[1] || reader.result;
-        resolve(base64);
-      } else {
-        reject(new Error('Failed to convert blob to base64'));
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
 };
 
 const VoiceToTextScreen = ({ navigation }: any) => {
@@ -1080,50 +1045,16 @@ const VoiceToTextScreen = ({ navigation }: any) => {
         return;
       }
 
-      // Web-specific audio mode - fixed TypeScript error
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
-        // Removed playsInSilentModeLockedIOS as it doesn't exist in the type
-        ...(Platform.OS === 'web' && {
-          // Web-specific overrides if needed
-        })
       });
 
       setDebugInfo(`🎙️ Starting recording in ${getCurrentFromLanguage().name}...`);
       
-      // Use web-specific preset if needed
-      const recordingOptions = Platform.OS === 'web' 
-        ? {
-            android: {
-              extension: '.m4a',
-              outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-              audioEncoder: Audio.AndroidAudioEncoder.AAC,
-              sampleRate: 44100,
-              numberOfChannels: 2,
-              bitRate: 128000,
-            },
-            ios: {
-              extension: '.m4a',
-              outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
-              audioQuality: Audio.IOSAudioQuality.HIGH,
-              sampleRate: 44100,
-              numberOfChannels: 2,
-              bitRate: 128000,
-              linearPCMBitDepth: 16,
-              linearPCMIsBigEndian: false,
-              linearPCMIsFloat: false,
-            },
-            web: {
-              mimeType: 'audio/webm', // Web prefers webm
-              bitsPerSecond: 128000,
-            },
-          }
-        : Audio.RecordingOptionsPresets.HIGH_QUALITY;
-      
       const { recording: newRecording } = await Audio.Recording.createAsync(
-        recordingOptions
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
 
       setIsRecording(true);
@@ -1154,28 +1085,15 @@ const VoiceToTextScreen = ({ navigation }: any) => {
       setRecording(null);
 
       if (uri) {
-        // WEB FIX: Use different approach for duration check on web
-        let duration = 0; // Initialize with default value
+        const sound = new Audio.Sound();
+        await sound.loadAsync({ uri });
+        const status = await sound.getStatusAsync();
+        await sound.unloadAsync();
+
+        const duration = status.isLoaded ? status.durationMillis : 0;
         
-        try {
-          const sound = new Audio.Sound();
-          await sound.loadAsync({ uri });
-          const status = await sound.getStatusAsync();
-          // Fix TypeScript error by ensuring we get a number
-          duration = status.isLoaded ? (status.durationMillis || 0) : 0;
-          await sound.unloadAsync();
-        } catch (soundError) {
-          console.log('⚠️ Could not load sound for duration check, using fallback');
-          // On web, sometimes we can't get duration, use a minimum check
-          duration = 2000; // Assume minimum duration for web
-        }
-        
-        // Relax the duration check for web
-        const isWeb = Platform.OS === 'web';
-        const minDuration = isWeb ? 500 : 1000; // 0.5s for web, 1s for mobile
-        
-        if (duration < minDuration) { // Now we know duration is a number
-          throw new Error(`Recording too short. Please speak for at least ${isWeb ? '0.5' : '1'} second${isWeb ? '' : 's'}.`);
+        if (!duration || duration < 1000) {
+          throw new Error('Recording too short. Please speak for at least 2 seconds.');
         }
         
         setDebugInfo(`✅ Recorded ${Math.round(duration/1000)}s audio...`);
@@ -1302,35 +1220,32 @@ const VoiceToTextScreen = ({ navigation }: any) => {
     Alert.alert('Cleared', 'All translation history removed');
   };
 
-  // ==================== UPDATED: Edge Function Transcription with WEB COMPATIBILITY ====================
+  // ==================== UPDATED: Edge Function Transcription with BASE64 ====================
   const transcribeWithEdgeFunction = async (audioUri: string): Promise<string> => {
     try {
       setDebugInfo('🔊 Processing audio via Edge Function...');
       console.log('🔍 [TRANSCRIBE] Audio URI:', audioUri);
       
-      // Handle different URI formats (web vs mobile)
-      let blob: Blob;
+      // Read the audio file
+      console.log('📤 [TRANSCRIBE] Fetching audio file...');
+      const response = await fetch(audioUri);
+      console.log('✅ [TRANSCRIBE] Fetched audio file, status:', response.status);
       
-      if (audioUri.startsWith('blob:') || audioUri.startsWith('data:')) {
-        // Web blob URL or data URL
-        console.log('🌐 [TRANSCRIBE] Web audio format detected');
-        const response = await fetch(audioUri);
-        blob = await response.blob();
-      } else if (audioUri.startsWith('file://')) {
-        // Mobile file URI - use XMLHttpRequest for web compatibility
-        console.log('📱 [TRANSCRIBE] Mobile file format detected');
-        blob = await uriToBlob(audioUri);
-      } else {
-        // Direct URL
-        console.log('🔗 [TRANSCRIBE] Direct URL format');
-        const response = await fetch(audioUri);
-        blob = await response.blob();
-      }
-      
+      const blob = await response.blob();
       console.log('✅ [TRANSCRIBE] Got blob, size:', blob.size, 'bytes, type:', blob.type);
 
-      // Convert to base64 with web compatibility
-      const base64Audio = await blobToBase64(blob);
+      // Convert to base64
+      const reader = new FileReader();
+      const base64Audio = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          // Remove data URL prefix (e.g., "data:audio/m4a;base64,")
+          const base64Data = base64.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
       
       console.log('📤 [TRANSCRIBE] Calling Edge Function with base64, length:', base64Audio.length);
 
