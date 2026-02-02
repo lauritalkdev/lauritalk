@@ -15,7 +15,8 @@ import {
   TextInput,
   TouchableOpacity,
   Vibration,
-  View
+  View,
+  Platform
 } from 'react-native';
 
 // ==================== REMOVED OPENAI API KEY ====================
@@ -353,6 +354,11 @@ const VoiceToTextScreen = ({ navigation }: any) => {
 
   // 🟢 Word count state for current translation
   const [currentWordCount, setCurrentWordCount] = useState(0);
+
+  // 🌐 WEB-SPECIFIC RECORDING STATE
+  const [webMediaRecorder, setWebMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [webAudioChunks, setWebAudioChunks] = useState<Blob[]>([]);
+  const [webRecordingStartTime, setWebRecordingStartTime] = useState<number>(0);
 
   // 🟢 Use new word limit hook
   const { 
@@ -1035,7 +1041,234 @@ const VoiceToTextScreen = ({ navigation }: any) => {
     setDebugInfo(`🌍 Output language: ${lang?.emoji} ${lang?.name}`);
   };
 
+  // ==================== 🌐 WEB RECORDING FUNCTIONS ====================
+  const startWebRecording = async () => {
+    try {
+      setDebugInfo('🌐 Initializing web microphone...');
+      console.log('🌐 [WEB] Starting web recording...');
+
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+
+      console.log('✅ [WEB] Microphone access granted');
+      setDebugInfo(`🎙️ Starting recording in ${getCurrentFromLanguage().name}...`);
+
+      // Create MediaRecorder
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const chunks: Blob[] = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+          console.log('📊 [WEB] Audio chunk received:', event.data.size, 'bytes');
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        console.log('⏹️ [WEB] Recording stopped, processing audio...');
+        setWebAudioChunks(chunks);
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.onerror = (event: any) => {
+        console.error('❌ [WEB] MediaRecorder error:', event);
+        setDebugInfo('❌ Recording error');
+      };
+
+      // Start recording
+      mediaRecorder.start();
+      setWebMediaRecorder(mediaRecorder);
+      setWebRecordingStartTime(Date.now());
+      setIsRecording(true);
+      startPulseAnimation();
+      setDebugInfo('🔴 Recording... Speak now!');
+      console.log('✅ [WEB] Recording started successfully');
+
+    } catch (error: any) {
+      console.error('❌ [WEB] Failed to start recording:', error);
+      Alert.alert('Recording Error', 'Unable to access microphone. Please check permissions.');
+      setIsRecording(false);
+    }
+  };
+
+  const stopWebRecording = async () => {
+    try {
+      setIsRecording(false);
+      setIsProcessing(true);
+      stopPulseAnimation();
+      setDebugInfo('⏳ Processing web recording...');
+      console.log('⏹️ [WEB] Stopping recording...');
+
+      if (!webMediaRecorder) {
+        throw new Error('No active web recording');
+      }
+
+      // Stop recording
+      webMediaRecorder.stop();
+
+      // Wait for chunks to be collected (give it a moment)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const duration = Date.now() - webRecordingStartTime;
+      console.log(`✅ [WEB] Recording duration: ${duration}ms`);
+
+      if (duration < 1000) {
+        throw new Error('Recording too short. Please speak for at least 2 seconds.');
+      }
+
+      // Create blob from chunks
+      const audioBlob = new Blob(webAudioChunks, { type: 'audio/webm' });
+      console.log('✅ [WEB] Audio blob created, size:', audioBlob.size, 'bytes');
+
+      if (audioBlob.size === 0) {
+        throw new Error('Recording failed - no audio captured.');
+      }
+
+      setDebugInfo(`✅ Recorded ${Math.round(duration/1000)}s audio...`);
+
+      // Convert blob to base64
+      const reader = new FileReader();
+      const base64Audio = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          const base64Data = base64.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(audioBlob);
+      });
+
+      console.log('✅ [WEB] Converted to base64, length:', base64Audio.length);
+
+      // Transcribe the audio
+      const transcribedText = await transcribeWebAudio(base64Audio);
+
+      // Check word limit
+      const { allowed } = await checkAndUpdateWordCount(transcribedText);
+      if (!allowed) {
+        console.log('Voice translation blocked due to word limit');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Translate
+      const translatedText = await translateTextWithDialectSupport(
+        transcribedText, 
+        fromLanguage, 
+        targetLanguage
+      );
+
+      // Calculate word count
+      const wordCount = countValidWords(transcribedText);
+      setCurrentWordCount(wordCount);
+
+      // Save to history
+      await saveVoiceTranslationToHistory(
+        transcribedText, 
+        translatedText, 
+        fromLanguage, 
+        targetLanguage
+      );
+
+      // Create recording info (with data URI for web playback)
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const recordingInfo = {
+        uri: audioUrl,
+        duration: duration,
+        timestamp: new Date().toLocaleTimeString(),
+        originalText: transcribedText,
+        translatedText: translatedText,
+        fromLanguage: fromLanguage,
+        targetLanguage: targetLanguage,
+        status: '✨ AI Translation (Web)',
+        wordCount: wordCount,
+        translationType: isCameroonianDialect(fromLanguage) || isCameroonianDialect(targetLanguage) 
+          ? '📚 Dictionary' 
+          : '🌐 AI'
+      };
+
+      setRecordings(prev => [recordingInfo, ...prev]);
+
+      if (isCameroonianDialect(fromLanguage) || isCameroonianDialect(targetLanguage)) {
+        setDebugInfo(`📚 Dictionary translation complete! (${wordCount} words)`);
+      } else {
+        setDebugInfo(`🎉 Translation complete! (${wordCount} words)`);
+      }
+
+      const fromLangName = getCurrentFromLanguage().name;
+      const toLangName = getCurrentToLanguage().name;
+
+      Alert.alert(
+        '🎊 Success!', 
+        `Translated from ${fromLangName} to ${toLangName}!\n\n${wordCount} valid words counted toward your rewards.`,
+        [{ text: 'OK', style: 'default' }]
+      );
+
+      // Clean up
+      setWebMediaRecorder(null);
+      setWebAudioChunks([]);
+      setWebRecordingStartTime(0);
+
+    } catch (error: any) {
+      console.error('❌ [WEB] Stop recording error:', error);
+      Alert.alert('Error', error.message);
+      setDebugInfo(`💥 ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const transcribeWebAudio = async (base64Audio: string): Promise<string> => {
+    try {
+      setDebugInfo('🔊 Processing audio via Edge Function...');
+      console.log('📤 [WEB] Calling Edge Function with base64 audio...');
+
+      const { data, error } = await supabase.functions.invoke('voice-to-text', {
+        body: {
+          action: 'transcribe',
+          audioBase64: base64Audio,
+          language: fromLanguage
+        }
+      });
+
+      console.log('📡 [WEB] Edge Function response:', { data, error });
+
+      if (error) {
+        console.error('❌ [WEB] Edge Function error:', error);
+        throw new Error(`Transcription error: ${error.message || JSON.stringify(error)}`);
+      }
+
+      if (data && data.text) {
+        console.log('✅ [WEB] Transcription successful:', data.text);
+        setDebugInfo('✅ Transcription successful!');
+        return data.text;
+      } else {
+        console.error('❌ [WEB] No text in response:', data);
+        throw new Error('No transcription received');
+      }
+
+    } catch (error: any) {
+      console.error('❌ [WEB] Transcription error:', error);
+      throw new Error(`Audio processing: ${error.message}`);
+    }
+  };
+
+  // ==================== MOBILE RECORDING FUNCTIONS (ORIGINAL) ====================
   const startRecording = async () => {
+    // 🌐 Use web recording on web platform
+    if (Platform.OS === 'web') {
+      return startWebRecording();
+    }
+
+    // 📱 Original mobile recording code
     try {
       setDebugInfo('🔊 Initializing microphone...');
       
@@ -1070,6 +1303,12 @@ const VoiceToTextScreen = ({ navigation }: any) => {
   };
 
   const stopRecording = async () => {
+    // 🌐 Use web stop recording on web platform
+    if (Platform.OS === 'web') {
+      return stopWebRecording();
+    }
+
+    // 📱 Original mobile stop recording code
     try {
       setIsRecording(false);
       setIsProcessing(true);
@@ -1197,6 +1436,17 @@ const VoiceToTextScreen = ({ navigation }: any) => {
     try {
       setDebugInfo('🔊 Playing original audio...');
       
+      // 🌐 Web: Use HTML5 Audio
+      if (Platform.OS === 'web') {
+        const audio = new Audio(uri);
+        audio.play();
+        audio.onended = () => {
+          setDebugInfo('Original audio playback finished');
+        };
+        return;
+      }
+
+      // 📱 Mobile: Use expo-av
       const sound = new Audio.Sound();
       await sound.loadAsync({ uri });
       await sound.playAsync();

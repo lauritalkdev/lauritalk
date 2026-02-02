@@ -47,6 +47,7 @@
     "expo-linking": "~8.0.11",
     "expo-media-library": "~18.2.1",
     "expo-random": "^14.0.1",
+    "expo-router": "^6.0.23",
     "expo-sharing": "^14.0.8",
     "expo-speech": "~14.0.8",
     "expo-speech-recognition": "^2.1.5",
@@ -85,4 +86,3 @@
     "typescript": "^5.9.3"
   }
 }
-
