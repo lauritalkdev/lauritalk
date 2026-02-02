@@ -1433,18 +1433,18 @@ const VoiceToTextScreen = ({ navigation }: any) => {
   };
 
   const playRecording = async (uri: string) => {
-    try {
-      setDebugInfo('🔊 Playing original audio...');
-      
-      // 🌐 Web: Use HTML5 Audio
-      if (Platform.OS === 'web') {
-        const audio = new Audio(uri);
-        audio.play();
-        audio.onended = () => {
-          setDebugInfo('Original audio playback finished');
-        };
-        return;
-      }
+  try {
+    setDebugInfo('🔊 Playing original audio...');
+    
+    // 🌐 Web: Use HTML5 Audio
+    if (Platform.OS === 'web') {
+      const audio = new (window as any).Audio(uri);  // ✅ FIXED
+      audio.play();
+      audio.onended = () => {
+        setDebugInfo('Original audio playback finished');
+      };
+      return;
+    }
 
       // 📱 Mobile: Use expo-av
       const sound = new Audio.Sound();
