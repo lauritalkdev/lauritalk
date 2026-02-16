@@ -1,4 +1,4 @@
-/* services/chatService.ts (UPDATED - OPTION 2: Duplicate Prevention Safety Layer) */
+/* services/chatService.ts (UPDATED - With Profile Joins for Connections) */
 import {
   ApiResponse,
   CHAT_CONSTANTS,
@@ -354,7 +354,9 @@ class ChatService {
               if (this.recentMessageIds.size > 100) {
                 // Remove oldest message ID
                 const firstId = this.recentMessageIds.values().next().value;
-                this.recentMessageIds.delete(firstId);
+                if (firstId) {
+                  this.recentMessageIds.delete(firstId);
+                }
               }
               
               console.log(`📨 [REALTIME] ✅ Calling callback for relevant message ${msg.id} (tracked: ${this.recentMessageIds.size} recent IDs)`);
@@ -737,12 +739,9 @@ class ChatService {
 
   async acceptConnectionRequest(connectionId: string): Promise<ApiResponse> {
     try {
-      console.log('🔵 [DEBUG] Starting acceptConnectionRequest for ID:', connectionId);
-      
       const userResponse = await supabase.auth.getUser();
       const userId = userResponse.data.user?.id;
       if (!userId) {
-        console.error('❌ [DEBUG] User not authenticated');
         return { success: false, error: 'User not authenticated' };
       }
 
@@ -753,7 +752,7 @@ class ChatService {
         .single();
 
       if (fetchError) {
-        console.error('❌ [DEBUG] Error fetching connection:', fetchError);
+        console.error('Error fetching connection:', fetchError);
         return { success: false, error: 'Connection not found' };
       }
 
@@ -783,7 +782,7 @@ class ChatService {
         .select();
 
       if (error) {
-        console.error('❌ [DEBUG] Supabase update error:', error);
+        console.error('Error updating connection:', error);
         return { success: false, error: error.message };
       }
 
@@ -801,7 +800,7 @@ class ChatService {
       };
       
     } catch (error: any) {
-      console.error('❌ [DEBUG] Unexpected error in acceptConnectionRequest:', error);
+      console.error('Error in acceptConnectionRequest:', error);
       return { success: false, error: error.message };
     }
   }
@@ -850,7 +849,7 @@ class ChatService {
         .select();
 
       if (error) {
-        console.error('❌ [DEBUG] Reject error:', error);
+        console.error('Error rejecting connection:', error);
         return { success: false, error: error.message };
       }
 
@@ -888,7 +887,7 @@ class ChatService {
         .single();
 
       if (fetchError) {
-        console.error('❌ [DEBUG] Error fetching connection:', fetchError);
+        console.error('Error fetching connection:', fetchError);
         return { success: false, error: 'Connection not found' };
       }
 
@@ -918,7 +917,7 @@ class ChatService {
         .select();
 
       if (error) {
-        console.error('❌ [DEBUG] Cancel error:', error);
+        console.error('Error cancelling connection:', error);
         return { success: false, error: error.message };
       }
 
@@ -936,18 +935,100 @@ class ChatService {
       };
       
     } catch (error: any) {
-      console.error('❌ [DEBUG] Unexpected error in cancelSentConnectionRequest:', error);
+      console.error('Error in cancelSentConnectionRequest:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // ================= GET CONNECTIONS METHODS =================
+  // ================= GET CONNECTIONS METHODS (UPDATED WITH PROFILE JOINS) =================
   async getPendingConnections(): Promise<ApiResponse<Connection[]>> {
     try {
       const userResponse = await supabase.auth.getUser();
       const userId = userResponse.data.user?.id;
       if (!userId) throw new Error('User not authenticated');
 
+      // Join with profiles table to get requester and receiver details
+      const { data, error } = await supabase
+        .from('connections')
+        .select(`
+          *,
+          requester:profiles!connections_requester_id_fkey(id, username, full_name),
+          receiver:profiles!connections_receiver_id_fkey(id, username, full_name)
+        `)
+        .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching pending connections:', error);
+        // Fallback to manual profile fetching
+        return this.getPendingConnectionsWithManualJoin(userId);
+      }
+
+      return { success: true, data: data || [] };
+    } catch (error: any) {
+      console.error('Error getting pending connections:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Fallback method that manually fetches profile data
+  private async getPendingConnectionsWithManualJoin(userId: string): Promise<ApiResponse<Connection[]>> {
+    try {
+      // First get the connections
+      const { data: connections, error } = await supabase
+        .from('connections')
+        .select('*')
+        .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (!connections || connections.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      // Collect all unique user IDs we need to fetch
+      const userIds = new Set<string>();
+      connections.forEach(conn => {
+        userIds.add(conn.requester_id);
+        userIds.add(conn.receiver_id);
+      });
+
+      // Fetch all profiles at once
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, full_name')
+        .in('id', Array.from(userIds));
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        return { success: true, data: connections };
+      }
+
+      // Create a map for quick lookup
+      const profileMap = new Map<string, { id: string; username: string | null; full_name: string | null }>();
+      profiles?.forEach(profile => {
+        profileMap.set(profile.id, profile);
+      });
+
+      // Attach profile data to connections
+      const connectionsWithProfiles: Connection[] = connections.map(conn => ({
+        ...conn,
+        requester: profileMap.get(conn.requester_id) || undefined,
+        receiver: profileMap.get(conn.receiver_id) || undefined,
+      }));
+
+      return { success: true, data: connectionsWithProfiles };
+    } catch (error: any) {
+      console.error('Error in getPendingConnectionsWithManualJoin:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Fallback method if join fails (simple query)
+  private async getPendingConnectionsFallback(userId: string): Promise<ApiResponse<Connection[]>> {
+    try {
       const { data, error } = await supabase
         .from('connections')
         .select('*')
@@ -958,7 +1039,7 @@ class ChatService {
       if (error) throw error;
       return { success: true, data: data || [] };
     } catch (error: any) {
-      console.error('Error getting pending connections:', error);
+      console.error('Error in getPendingConnectionsFallback:', error);
       return { success: false, error: error.message };
     }
   }
@@ -969,6 +1050,88 @@ class ChatService {
       const userId = userResponse.data.user?.id;
       if (!userId) throw new Error('User not authenticated');
 
+      // Join with profiles table to get requester and receiver details
+      const { data, error } = await supabase
+        .from('connections')
+        .select(`
+          *,
+          requester:profiles!connections_requester_id_fkey(id, username, full_name),
+          receiver:profiles!connections_receiver_id_fkey(id, username, full_name)
+        `)
+        .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`)
+        .eq('status', 'accepted')
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching active connections:', error);
+        // Fallback to manual profile fetching
+        return this.getActiveConnectionsWithManualJoin(userId);
+      }
+
+      return { success: true, data: data || [] };
+    } catch (error: any) {
+      console.error('Error getting active connections:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Fallback method that manually fetches profile data for active connections
+  private async getActiveConnectionsWithManualJoin(userId: string): Promise<ApiResponse<Connection[]>> {
+    try {
+      // First get the connections
+      const { data: connections, error } = await supabase
+        .from('connections')
+        .select('*')
+        .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`)
+        .eq('status', 'accepted')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      if (!connections || connections.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      // Collect all unique user IDs we need to fetch
+      const userIds = new Set<string>();
+      connections.forEach(conn => {
+        userIds.add(conn.requester_id);
+        userIds.add(conn.receiver_id);
+      });
+
+      // Fetch all profiles at once
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, full_name')
+        .in('id', Array.from(userIds));
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        return { success: true, data: connections };
+      }
+
+      // Create a map for quick lookup
+      const profileMap = new Map<string, { id: string; username: string | null; full_name: string | null }>();
+      profiles?.forEach(profile => {
+        profileMap.set(profile.id, profile);
+      });
+
+      // Attach profile data to connections
+      const connectionsWithProfiles: Connection[] = connections.map(conn => ({
+        ...conn,
+        requester: profileMap.get(conn.requester_id) || undefined,
+        receiver: profileMap.get(conn.receiver_id) || undefined,
+      }));
+
+      return { success: true, data: connectionsWithProfiles };
+    } catch (error: any) {
+      console.error('Error in getActiveConnectionsWithManualJoin:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Fallback method if join fails (simple query)
+  private async getActiveConnectionsFallback(userId: string): Promise<ApiResponse<Connection[]>> {
+    try {
       const { data, error } = await supabase
         .from('connections')
         .select('*')
@@ -979,7 +1142,7 @@ class ChatService {
       if (error) throw error;
       return { success: true, data: data || [] };
     } catch (error: any) {
-      console.error('Error getting active connections:', error);
+      console.error('Error in getActiveConnectionsFallback:', error);
       return { success: false, error: error.message };
     }
   }

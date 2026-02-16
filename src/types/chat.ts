@@ -3,6 +3,13 @@
 // Connection types
 export type ConnectionStatus = 'pending' | 'accepted' | 'rejected' | 'blocked';
 
+// Profile data returned from joins
+export interface ConnectionProfile {
+  id: string;
+  username: string | null;
+  full_name: string | null;
+}
+
 export interface Connection {
   id: string;
   requester_id: string;
@@ -10,6 +17,12 @@ export interface Connection {
   status: ConnectionStatus;
   created_at: string;
   updated_at: string;
+  // Optional joined profile data
+  requester?: ConnectionProfile;
+  receiver?: ConnectionProfile;
+  // Legacy fields (may exist in DB)
+  requester_username?: string | null;
+  receiver_username?: string | null;
 }
 
 export interface ConnectionRequest {
@@ -141,3 +154,11 @@ export const CHAT_CONSTANTS = {
   REALTIME_CHANNEL: 'chat_updates',
   CONNECTION_UPDATE_CHANNEL: 'connection_updates',
 } as const;
+
+// Helper function to get display name from connection profile
+export const getDisplayName = (profile?: ConnectionProfile | null, fallbackUsername?: string | null): string => {
+  if (profile?.full_name) return profile.full_name;
+  if (profile?.username) return profile.username;
+  if (fallbackUsername) return fallbackUsername;
+  return 'Unknown User';
+};
