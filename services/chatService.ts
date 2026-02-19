@@ -1,4 +1,4 @@
-/* services/chatService.ts (UPDATED - With Profile Joins for Connections) */
+/* services/chatService.ts (UPDATED - With Profile Joins for Connections + Chat Translation Limits) */
 import {
   ApiResponse,
   CHAT_CONSTANTS,
@@ -28,6 +28,32 @@ interface TranslationResponse {
   translated_text: string;
   translation_provider: string;
   confidence_score?: number;
+}
+
+// ==================== CHAT TRANSLATION LIMIT INTERFACES ====================
+export interface ChatTranslationLimitStatus {
+  success: boolean;
+  is_premium: boolean;
+  can_translate: boolean;
+  current_count: number;
+  monthly_limit: number;
+  remaining_words: number;
+  reset_date?: string;
+  days_until_reset?: number;
+  error?: string;
+}
+
+export interface ChatTranslationUpdateResult {
+  success: boolean;
+  is_premium: boolean;
+  limit_exceeded: boolean;
+  current_count: number;
+  monthly_limit: number;
+  remaining_words: number;
+  words_added?: number;
+  reset_date?: string;
+  error?: string;
+  message?: string;
 }
 
 // Local cache for translations to avoid duplicate API calls
@@ -268,6 +294,173 @@ class ChatService {
     };
     
     return languageMap[languageCode] || languageCode.toUpperCase();
+  }
+
+  // ==================== CHAT TRANSLATION LIMIT METHODS ====================
+
+  /**
+   * Count words in a text string
+   */
+  countWords(text: string): number {
+    if (!text || text.trim().length === 0) return 0;
+    const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+    return words.length;
+  }
+
+  /**
+   * Get chat translation limit status for current user
+   */
+  async getChatTranslationStatus(): Promise<ApiResponse<ChatTranslationLimitStatus>> {
+    try {
+      const userResponse = await supabase.auth.getUser();
+      const userId = userResponse.data.user?.id;
+      if (!userId) {
+        return { 
+          success: false, 
+          error: 'User not authenticated',
+          data: {
+            success: false,
+            is_premium: false,
+            can_translate: false,
+            current_count: 0,
+            monthly_limit: 100,
+            remaining_words: 0,
+            error: 'User not authenticated'
+          }
+        };
+      }
+
+      const { data, error } = await supabase.rpc('get_chat_translation_status', {
+        p_user_id: userId
+      });
+
+      if (error) {
+        console.error('Error getting chat translation status:', error);
+        return { 
+          success: false, 
+          error: error.message,
+          data: {
+            success: false,
+            is_premium: false,
+            can_translate: false,
+            current_count: 0,
+            monthly_limit: 100,
+            remaining_words: 0,
+            error: error.message
+          }
+        };
+      }
+
+      const statusData = data as ChatTranslationLimitStatus;
+      return { 
+        success: true, 
+        data: statusData 
+      };
+    } catch (error: any) {
+      console.error('Error in getChatTranslationStatus:', error);
+      return { 
+        success: false, 
+        error: error.message,
+        data: {
+          success: false,
+          is_premium: false,
+          can_translate: false,
+          current_count: 0,
+          monthly_limit: 100,
+          remaining_words: 0,
+          error: error.message
+        }
+      };
+    }
+  }
+
+  /**
+   * Update chat translation word count after successful translation
+   */
+  async updateChatTranslationCount(wordCount: number): Promise<ApiResponse<ChatTranslationUpdateResult>> {
+    try {
+      const userResponse = await supabase.auth.getUser();
+      const userId = userResponse.data.user?.id;
+      if (!userId) {
+        return { 
+          success: false, 
+          error: 'User not authenticated',
+          data: {
+            success: false,
+            is_premium: false,
+            limit_exceeded: true,
+            current_count: 0,
+            monthly_limit: 100,
+            remaining_words: 0,
+            error: 'User not authenticated'
+          }
+        };
+      }
+
+      const { data, error } = await supabase.rpc('update_chat_translation_count', {
+        p_user_id: userId,
+        p_word_count: wordCount
+      });
+
+      if (error) {
+        console.error('Error updating chat translation count:', error);
+        return { 
+          success: false, 
+          error: error.message,
+          data: {
+            success: false,
+            is_premium: false,
+            limit_exceeded: true,
+            current_count: 0,
+            monthly_limit: 100,
+            remaining_words: 0,
+            error: error.message
+          }
+        };
+      }
+
+      const updateData = data as ChatTranslationUpdateResult;
+      return { 
+        success: updateData.success, 
+        data: updateData 
+      };
+    } catch (error: any) {
+      console.error('Error in updateChatTranslationCount:', error);
+      return { 
+        success: false, 
+        error: error.message,
+        data: {
+          success: false,
+          is_premium: false,
+          limit_exceeded: true,
+          current_count: 0,
+          monthly_limit: 100,
+          remaining_words: 0,
+          error: error.message
+        }
+      };
+    }
+  }
+
+  /**
+   * Check if user can translate (has remaining words)
+   */
+  async canUserTranslate(): Promise<{ canTranslate: boolean; status: ChatTranslationLimitStatus | null }> {
+    try {
+      const response = await this.getChatTranslationStatus();
+      
+      if (!response.success || !response.data) {
+        return { canTranslate: false, status: null };
+      }
+
+      return { 
+        canTranslate: response.data.can_translate, 
+        status: response.data 
+      };
+    } catch (error) {
+      console.error('Error checking if user can translate:', error);
+      return { canTranslate: false, status: null };
+    }
   }
 
   // ==================== REALTIME SUBSCRIPTIONS - OPTION 2: WITH DUPLICATE PREVENTION ====================
@@ -1426,11 +1619,11 @@ class ChatService {
     }
   }
 
-  // ==================== FRONTEND AUTO TRANSLATE ALL MESSAGES (USING EDGE FUNCTION) ====================
+  // ==================== FRONTEND AUTO TRANSLATE ALL MESSAGES (WITH LIMIT CHECKING) ====================
   async autoTranslateIncomingMessage(
     message: ChatMessage,
     targetLanguage: string
-  ): Promise<ApiResponse<{ translated_text: string }>> {
+  ): Promise<ApiResponse<{ translated_text: string; limit_exceeded?: boolean; limit_status?: ChatTranslationLimitStatus }>> {
     try {
       console.log(`🔍 [DEBUG] Auto-translate called for message ${message.id.substring(0, 20)} to ${targetLanguage}`);
       
@@ -1473,6 +1666,27 @@ class ChatService {
         };
       }
 
+      // CHECK CHAT TRANSLATION LIMIT BEFORE TRANSLATING
+      const limitCheck = await this.getChatTranslationStatus();
+      if (limitCheck.success && limitCheck.data) {
+        // If not premium and limit exceeded, return limit exceeded response
+        if (!limitCheck.data.is_premium && !limitCheck.data.can_translate) {
+          console.log('⚠️ [FRONTEND] Chat translation limit exceeded');
+          return {
+            success: false,
+            error: 'Chat translation limit exceeded',
+            data: {
+              translated_text: '',
+              limit_exceeded: true,
+              limit_status: limitCheck.data
+            }
+          };
+        }
+      }
+
+      // Calculate word count for this message
+      const wordCount = this.countWords(message.original_text);
+
       // Call Edge Function for translation
       console.log(`📤 [FRONTEND] Translating incoming message via Edge Function: ${originalLang} → ${targetLanguage}`);
       
@@ -1487,6 +1701,14 @@ class ChatService {
       // Store in local cache
       localTranslationCache.set(localCacheKey, translatedText);
 
+      // UPDATE WORD COUNT AFTER SUCCESSFUL TRANSLATION (only for non-premium users)
+      if (limitCheck.data && !limitCheck.data.is_premium) {
+        const updateResult = await this.updateChatTranslationCount(wordCount);
+        if (updateResult.data) {
+          console.log(`📊 [FRONTEND] Updated word count: ${updateResult.data.current_count}/${updateResult.data.monthly_limit}`);
+        }
+      }
+
       return {
         success: true,
         data: { translated_text: translatedText }
@@ -1500,7 +1722,7 @@ class ChatService {
     }
   }
 
-  // ==================== TRANSLATE ALL MESSAGES FOR PREMIUM USERS (USING EDGE FUNCTION) ====================
+  // ==================== TRANSLATE ALL MESSAGES FOR USERS (WITH LIMIT CHECKING) ====================
   async translateMessagesForUser(
     messages: ChatMessage[],
     targetLanguage: string,
@@ -1517,8 +1739,24 @@ class ChatService {
         };
       }
 
+      // CHECK CHAT TRANSLATION LIMIT BEFORE TRANSLATING
+      const limitCheck = await this.getChatTranslationStatus();
+      if (limitCheck.success && limitCheck.data) {
+        // If not premium and limit exceeded, return limit exceeded response
+        if (!limitCheck.data.is_premium && !limitCheck.data.can_translate) {
+          console.log('⚠️ [FRONTEND] Chat translation limit exceeded');
+          return {
+            success: false,
+            error: 'Chat translation limit exceeded'
+          };
+        }
+      }
+
+      const isPremium = limitCheck.data?.is_premium || false;
+      const remainingWords = limitCheck.data?.remaining_words || 0;
+
       // Filter messages that need translation (incoming messages only)
-      const messagesToTranslate = messages.filter(msg => 
+      let messagesToTranslate = messages.filter(msg => 
         msg.sender_id !== currentUserId && // Only incoming messages
         !msg.translated_text && // Not already translated
         msg.original_text && 
@@ -1534,7 +1772,46 @@ class ChatService {
         };
       }
 
-      console.log(`🔄 [FRONTEND] Translating ${messagesToTranslate.length} incoming messages`);
+      // For non-premium users, check if we have enough remaining words
+      let totalWordsToTranslate = 0;
+      if (!isPremium) {
+        for (const msg of messagesToTranslate) {
+          totalWordsToTranslate += this.countWords(msg.original_text);
+        }
+        
+        // If total words exceed remaining, limit the messages we translate
+        if (totalWordsToTranslate > remainingWords) {
+          console.log(`⚠️ [FRONTEND] Total words (${totalWordsToTranslate}) exceeds remaining (${remainingWords}), limiting translations`);
+          
+          // Translate only messages that fit within the limit
+          let wordsUsed = 0;
+          const limitedMessages: ChatMessage[] = [];
+          
+          for (const msg of messagesToTranslate) {
+            const msgWordCount = this.countWords(msg.original_text);
+            if (wordsUsed + msgWordCount <= remainingWords) {
+              limitedMessages.push(msg);
+              wordsUsed += msgWordCount;
+            } else {
+              break;
+            }
+          }
+          
+          if (limitedMessages.length === 0) {
+            // No room for any translation
+            return {
+              success: false,
+              error: 'Chat translation limit exceeded'
+            };
+          }
+          
+          // Update to only translate limited messages
+          messagesToTranslate = limitedMessages;
+          totalWordsToTranslate = wordsUsed;
+        }
+      }
+
+      console.log(`🔄 [FRONTEND] Translating ${messagesToTranslate.length} incoming messages (${totalWordsToTranslate} words)`);
 
       // Extract texts for batch translation
       const textsToTranslate = messagesToTranslate.map(msg => msg.original_text);
@@ -1616,6 +1893,14 @@ class ChatService {
         // Store in local cache
         const cacheKey = `${msg.original_text}|${msg.original_language || 'en'}|${targetLanguage}`;
         localTranslationCache.set(cacheKey, translatedText);
+      }
+
+      // UPDATE WORD COUNT AFTER SUCCESSFUL TRANSLATION (only for non-premium users)
+      if (!isPremium && totalWordsToTranslate > 0) {
+        const updateResult = await this.updateChatTranslationCount(totalWordsToTranslate);
+        if (updateResult.data) {
+          console.log(`📊 [FRONTEND] Updated word count: ${updateResult.data.current_count}/${updateResult.data.monthly_limit}`);
+        }
       }
 
       console.log(`✅ [FRONTEND] Successfully translated ${messagesToTranslate.length} messages`);
